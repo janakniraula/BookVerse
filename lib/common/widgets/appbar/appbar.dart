@@ -26,226 +26,237 @@ class TAppBar extends StatefulWidget implements PreferredSizeWidget {
   final bool showSearchBox;
 
   @override
-  _TAppBarState createState() => _TAppBarState();
+  State<TAppBar> createState() => _TAppBarState();
 
   @override
   Size get preferredSize => Size.fromHeight(
-    showSearchBox ? TDeviceUtils.getAppBarHeight() + 150 : TDeviceUtils.getAppBarHeight(),
-  );
+        showSearchBox
+            ? TDeviceUtils.getAppBarHeight() + 150
+            : TDeviceUtils.getAppBarHeight(),
+      );
 }
 
 class _TAppBarState extends State<TAppBar> {
-  String query = '';
-  List<DocumentSnapshot> searchResults = [];
-  FocusNode searchFocusNode = FocusNode();
-  User? currentUser;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  List<DocumentSnapshot> _searchResults = [];
+  bool _isSearching = false;
 
   @override
   void initState() {
     super.initState();
-    _getCurrentUser(); // Get the currently logged-in user
-    searchFocusNode.addListener(() {
-      if (!searchFocusNode.hasFocus) {
+    _setupSearchListeners();
+  }
+
+  void _setupSearchListeners() {
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus) {
+        _clearSearch();
+      }
+    });
+
+    _searchController.addListener(() {
+      if (_searchController.text.isEmpty) {
         setState(() {
-          searchResults = [];
-          query = '';
+          _searchResults = [];
+          _isSearching = false;
         });
+      } else {
+        _performSearch(_searchController.text);
       }
     });
   }
 
-  Future<void> _getCurrentUser() async {
-    final user = FirebaseAuth.instance.currentUser;
+  void _clearSearch() {
     setState(() {
-      currentUser = user;
+      _searchResults = [];
+      _searchController.clear();
+      _isSearching = false;
+      _focusNode.unfocus();
+      _searchController.selection = const TextSelection.collapsed(offset: -1);
     });
   }
 
-  Future<void> _deleteSearchedBooks(String userId) async {
+  Future<void> _performSearch(String query) async {
+    if (query.isEmpty) return;
+
+    setState(() => _isSearching = true);
+
     try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('searchedBooks')
-          .where('userId', isEqualTo: userId)
-          .get();
+      final snapshot =
+          await FirebaseFirestore.instance.collection('books').get();
 
-      for (var doc in querySnapshot.docs) {
-        await doc.reference.delete();
-      }
+      if (!mounted) return;
 
-      print('All previous searched books deleted successfully.');
-    } catch (e) {
-      print('Failed to delete searched books: $e');
-    }
-  }
-
-  Future<void> _searchBooks(String query) async {
-    if (query.isEmpty) {
       setState(() {
-        searchResults = [];
+        _searchResults = snapshot.docs.where((doc) {
+          final data = doc.data();
+          final title = data['title']?.toString().toUpperCase() ?? '';
+          final writer = data['writer']?.toString().toUpperCase() ?? '';
+          final searchQuery = query.toUpperCase();
+          return title.contains(searchQuery) || writer.contains(searchQuery);
+        }).toList();
+        _isSearching = false;
       });
-      return;
-    }
-
-    if (currentUser == null) {
-      print('No user is logged in.');
-      return;
-    }
-
-    final userId = currentUser!.uid;
-
-    // Clear existing searched books for the user
-    await _deleteSearchedBooks(userId);
-
-    final uppercaseQuery = query.toUpperCase();
-    final snapshot = await FirebaseFirestore.instance.collection('books').get();
-
-    setState(() {
-      searchResults = snapshot.docs.where((doc) {
-        final bookData = doc.data();
-        final bookTitle = (bookData['title'] ?? '').toUpperCase();
-        final bookWriter = (bookData['writer'] ?? '').toUpperCase();
-
-        return bookTitle.contains(uppercaseQuery) || bookWriter.contains(uppercaseQuery);
-      }).toList();
-    });
-
-    // Save the new search results
-    for (var doc in searchResults) {
-      _saveSearchedBooks(doc, query, userId);
-    }
-  }
-
-  Future<void> _saveSearchedBooks(DocumentSnapshot doc, String searchQuery, String userId) async {
-    try {
-      final bookId = doc.id;
-      final book = doc.data() as Map<String, dynamic>;
-      final title = book['title']?.toString() ?? 'No title';
-      final writer = book['writer']?.toString() ?? 'Unknown author';
-      final imageUrl = book['imageUrl']?.toString() ?? '';
-      final course = book['course']?.toString() ?? '';
-      final summary = book['summary']?.toString() ?? 'No summary available';
-
-      if (title.trim().toLowerCase() == searchQuery.trim().toLowerCase()) {
-        await FirebaseFirestore.instance.collection('searchedBooks').add({
-          'userId': userId,
-          'bookId': bookId,
-          'title': title,
-          'writer': writer,
-          'imageUrl': imageUrl,
-          'course': course,
-          'summary': summary,
-          'searchedAt': FieldValue.serverTimestamp(),
-        });
-        print('Book saved: $title');
-      }
-    } catch (e, stackTrace) {
-      print('Failed to save searched book: $e');
-      print('StackTrace: $stackTrace');
+    } catch (e) {
+      debugPrint('Search error: $e');
+      setState(() => _isSearching = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: TSizes.md),
-      child: Column(
-        children: [
-          AppBar(
-            automaticallyImplyLeading: false,
-            leading: widget.showBackArrow
-                ? IconButton(
-              onPressed: () => Get.back(),
-              icon: const Icon(Iconsax.arrow_left, color: Colors.purple),
-            )
-                : widget.leadingIcon != null
-                ? IconButton(onPressed: widget.leadingOnProgress, icon: Icon(widget.leadingIcon))
-                : null,
-            title: widget.title,
-            actions: widget.actions,
-          ),
-          if (widget.showSearchBox) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: TextField(
-                focusNode: searchFocusNode,
-                onChanged: (value) {
-                  setState(() {
-                    query = value;
-                  });
-                  _searchBooks(value);
-                },
-                decoration: InputDecoration(
-                  hintText: 'Search...',
-                  hintStyle: TextStyle(color: Colors.grey[400]),
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                  prefixIcon: const Icon(Iconsax.search_normal, color: Colors.grey),
-                ),
-                onTap: () {
-                  searchFocusNode.requestFocus();
-                },
-              ),
-            ),
-            if (query.isNotEmpty && searchResults.isNotEmpty)
-              Container(
-                color: Colors.white,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: searchResults.length,
-                  itemBuilder: (context, index) {
-                    final book = searchResults[index].data() as Map<String, dynamic>;
-                    final title = book['title'] ?? 'No title';
-                    final writer = book['writer'] ?? 'Unknown author';
-                    final imageUrl = book['imageUrl'] ?? '';
-                    final course = book['course'] ?? '';
-                    final summary = book['summary'] ?? 'No summary available';
-
-                    return ListTile(
-                      leading: imageUrl.isEmpty
-                          ? const Icon(Icons.book, size: 50)
-                          : Image.network(
-                        imageUrl,
-                        width: 50,
-                        height: 70,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.book, size: 50);
-                        },
-                      ),
-                      title: Text(title),
-                      subtitle: Text(writer),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => CourseBookDetailScreen(
-                              title: title,
-                              writer: writer,
-                              imageUrl: imageUrl,
-                              course: course,
-                              summary: summary,
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () {
+        _clearSearch();
+        FocusManager.instance.primaryFocus?.unfocus();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: TSizes.md),
+        child: Column(
+          children: [
+            _buildAppBar(),
+            if (widget.showSearchBox) ...[
+              _buildSearchBar(),
+              if (_searchResults.isNotEmpty) _buildSearchResults(),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppBar() {
+    return AppBar(
+      automaticallyImplyLeading: false,
+      leading: widget.showBackArrow
+          ? IconButton(
+              onPressed: () => Get.back(),
+              icon: const Icon(Iconsax.arrow_left, color: Colors.white),
+            )
+          : widget.leadingIcon != null
+              ? IconButton(
+                  onPressed: widget.leadingOnProgress,
+                  icon: Icon(widget.leadingIcon!),
+                )
+              : null,
+      title: widget.title,
+      actions: widget.actions,
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: TextField(
+        controller: _searchController,
+        focusNode: _focusNode,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          hintText: 'Search books...',
+          hintStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+          prefixIcon:
+              Icon(Iconsax.search_normal, color: Colors.white.withOpacity(0.7)),
+          filled: true,
+          fillColor: Colors.white.withOpacity(0.2),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.white),
+          ),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.4,
+      ),
+      margin: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+          ),
         ],
       ),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(8),
+        itemCount: _searchResults.length,
+        itemBuilder: (context, index) {
+          final book = _searchResults[index].data() as Map<String, dynamic>;
+          return _buildSearchResultItem(book);
+        },
+      ),
+    );
+  }
+
+  Widget _buildSearchResultItem(Map<String, dynamic> book) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          book['imageUrl'] ?? '',
+          width: 45,
+          height: 65,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            width: 45,
+            height: 65,
+            color: Colors.grey.shade200,
+            child: const Icon(Icons.book, color: Colors.grey),
+          ),
+        ),
+      ),
+      title: Text(
+        book['title'] ?? 'No title',
+        style: const TextStyle(fontWeight: FontWeight.w500),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        book['writer'] ?? 'Unknown author',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      onTap: () {
+        _clearSearch();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CourseBookDetailScreen(
+              title: book['title'] ?? 'No title',
+              writer: book['writer'] ?? 'Unknown author',
+              imageUrl: book['imageUrl'] ?? '',
+              course: book['course'] ?? '',
+              summary: book['summary'] ?? 'No summary available',
+            ),
+          ),
+        );
+      },
     );
   }
 
   @override
   void dispose() {
-    searchFocusNode.dispose();
+    _searchController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 }

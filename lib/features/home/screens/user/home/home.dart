@@ -232,67 +232,75 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            children: [
-              // Header
-              const TPrimaryHeaderContainer(
-                child: Column(
-                  children: [
-                    SizedBox(height: TSizes.sm),
-                    THomeAppBar(),
-                    SizedBox(height: TSizes.spaceBtwSections),
-                  ],
-                ),
-              ),
-
-              // Body
-              if (_isLoading)
-                _buildLoadingState()
-              else if (_error != null)
-                _buildErrorState()
-              else
-                Padding(
-                  padding: const EdgeInsets.all(TSizes.cardRadiusSm),
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () {
+        // Hide keyboard and remove focus from any text field
+        FocusScope.of(context).unfocus();
+        FocusManager.instance.primaryFocus?.unfocus();
+      },
+      child: Scaffold(
+        body: RefreshIndicator(
+          onRefresh: _loadData,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              children: [
+                // Header
+                const TPrimaryHeaderContainer(
                   child: Column(
                     children: [
-                      // Recommendations Section
-                      const ContentBasedAlgorithm(),
-                      const Divider(),
-
-                      // Course Books Section
-                      TSectionHeading(
-                        title: '| Course Books',
-                        fontSize: 25,
-                        onPressed: () {},
-                      ),
-                      _buildSectionGrid(
-                        items: _courseBooks,
-                        cardBuilder: _buildGradeCard,
-                        childAspectRatio: 4/3,
-                      ),
-                      const Divider(),
-                      const SizedBox(height: TSizes.spaceBtwItems),
-
-                      // Genre Section
-                      TSectionHeading(
-                        title: '| Genre',
-                        fontSize: 25,
-                        onPressed: () {},
-                      ),
-                      _buildSectionGrid(
-                        items: _genreBooks,
-                        cardBuilder: _buildGenreCard,
-                        childAspectRatio: 3,
-                      ),
+                      SizedBox(height: TSizes.sm),
+                      THomeAppBar(),
+                      SizedBox(height: TSizes.spaceBtwSections),
                     ],
                   ),
                 ),
-            ],
+
+                // Body
+                if (_isLoading)
+                  _buildLoadingState()
+                else if (_error != null)
+                  _buildErrorState()
+                else
+                  Padding(
+                    padding: const EdgeInsets.all(TSizes.cardRadiusSm),
+                    child: Column(
+                      children: [
+                        // Recommendations Section
+                        const ContentBasedAlgorithm(),
+                        const Divider(),
+
+                        // Course Books Section
+                        TSectionHeading(
+                          title: '| Course Books',
+                          fontSize: 25,
+                          onPressed: () {},
+                        ),
+                        _buildSectionGrid(
+                          items: _courseBooks,
+                          cardBuilder: _buildGradeCard,
+                          childAspectRatio: 4 / 3,
+                        ),
+                        const Divider(),
+                        const SizedBox(height: TSizes.spaceBtwItems),
+
+                        // Genre Section
+                        TSectionHeading(
+                          title: '| Genre',
+                          fontSize: 25,
+                          onPressed: () {},
+                        ),
+                        _buildSectionGrid(
+                          items: _genreBooks,
+                          cardBuilder: _buildGenreCard,
+                          childAspectRatio: 3,
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

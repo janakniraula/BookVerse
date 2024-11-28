@@ -28,7 +28,11 @@ class THomeAppBar extends StatelessWidget {
         children: [
           Text(
             TTexts.homeAppBarTitle,
-            style: Theme.of(context).textTheme.headlineSmall!.apply(color: TColors.grey),
+            style: Theme
+                .of(context)
+                .textTheme
+                .headlineSmall!
+                .apply(color: TColors.grey),
           ),
           Obx(() {
             if (controller.profileLoading.value) {
@@ -36,7 +40,11 @@ class THomeAppBar extends StatelessWidget {
             } else {
               return Text(
                 controller.user.value.fullName,
-                style: Theme.of(context).textTheme.bodySmall!.apply(color: TColors.white),
+                style: Theme
+                    .of(context)
+                    .textTheme
+                    .bodySmall!
+                    .apply(color: TColors.white),
               );
             }
           })
@@ -48,7 +56,8 @@ class THomeAppBar extends StatelessWidget {
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('notifications')
-              .where('isRead', isEqualTo: false) // Only count unread notifications
+              .where(
+              'isRead', isEqualTo: false) // Only count unread notifications
               .snapshots(),
           builder: (context, snapshot) {
             int notificationCount = 0;
@@ -56,7 +65,8 @@ class THomeAppBar extends StatelessWidget {
               notificationCount = snapshot.data!.docs.length;
             }
             return TCartCounterIcons(
-              onPressed: () => showNotificationPopup(context), // Open popup instead of navigating
+              onPressed: () => showNotificationPopup(context),
+              // Open popup instead of navigating
               iconColor: Colors.yellowAccent,
               icon: Iconsax.notification,
               count: notificationCount,
@@ -66,26 +76,29 @@ class THomeAppBar extends StatelessWidget {
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('issuedBooks')
-              .where('userId', isEqualTo: FirebaseAuth.instance.currentUser?.uid) // Filter by current user ID
-              .where('issueDate', isLessThan: Timestamp.now()) // Filter for books not returned
+              .where('userId', isEqualTo: FirebaseAuth.instance.currentUser
+              ?.uid) // Filter by current user ID
+              .where('issueDate',
+              isLessThan: Timestamp.now()) // Filter for books not returned
               .where('isRead', isEqualTo: false)
               .snapshots(),
           builder: (context, snapshot) {
             int reminderCount = 0;
             if (snapshot.hasData) {
-              reminderCount = snapshot.data!.docs.length; // Count the overdue books
+              reminderCount =
+                  snapshot.data!.docs.length; // Count the overdue books
             }
             return TCartCounterIcons(
               icon: Iconsax.receipt_text,
               iconColor: Colors.yellowAccent,
               count: reminderCount,
-              onPressed: () => showReminderPopup(context), // Show reminder count as tooltip
+              onPressed: () =>
+                  showReminderPopup(context), // Show reminder count as tooltip
             );
           },
-        )
-    ,
+        ),
 
-    // User Icon without Count
+        // User Icon without Count
         TCartCounterIcons(
           onPressed: () => Get.to(() => const userScreen()),
           iconColor: TColors.white,

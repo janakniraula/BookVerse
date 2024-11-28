@@ -16,37 +16,81 @@ class AdminNavigationMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.put(AdminNavigationController());
     final darkMode = THelperFunction.isDarkMode(context);
+
     return Scaffold(
       bottomNavigationBar: Obx(
             () => NavigationBar(
-            height: 60,
-            elevation: 0,
-            selectedIndex: controller.selectedIndex.value,
-            onDestinationSelected: (index) => controller.selectedIndex.value = index,
-            backgroundColor: darkMode ? TColors.black : Colors.white.withOpacity(0.1),
-            indicatorColor: darkMode ? TColors.white.withOpacity(0.3) : TColors.black.withOpacity(0.3),
-            destinations: const [
-              NavigationDestination(icon: Icon(Iconsax.add), label: 'Dashboard'),
-              NavigationDestination(icon: Icon(Iconsax.user), label: 'Users'),
-              NavigationDestination(icon: Icon(Iconsax.book_1), label: 'Add Books'),
-              NavigationDestination(icon: Icon(Iconsax.edit), label: 'Edit'),
-              NavigationDestination(icon: Icon(Iconsax.setting), label: 'Settings'),
+          height: 65,
+          elevation: 0,
+          selectedIndex: controller.selectedIndex.value,
+          onDestinationSelected: controller.onDestinationSelected,
+          backgroundColor: darkMode
+              ? TColors.black
+              : Colors.white.withOpacity(0.1),
+          indicatorColor: darkMode
+              ? TColors.white.withOpacity(0.3)
+              : TColors.black.withOpacity(0.3),
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Iconsax.book_1),
+              label: 'Add Books',
+            ),
+            NavigationDestination(
+              icon: Icon(Iconsax.edit),
+              label: 'Edit',
+            ),
+            NavigationDestination(
+              icon: Icon(Iconsax.home),
+              label: 'Dashboard',
+            ),
+            NavigationDestination(
+              icon: Icon(Iconsax.message_question),
+              label: 'Requests',
+            ),
+            NavigationDestination(
+              icon: Icon(Iconsax.setting),
+              label: 'Settings',
+            ),
           ],
         ),
       ),
-      body: Obx(() => controller.screens[controller.selectedIndex.value]),
+      body: Obx(
+            () => AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: controller.currentScreen,
+        ),
+      ),
     );
   }
 }
 
 class AdminNavigationController extends GetxController {
-  final Rx<int> selectedIndex = 0.obs;
+  static AdminNavigationController get instance => Get.find();
 
-  final screens = [
-    const Dashboard(),
-    const AdminUserRequestsScreen(),
-    const AddBooks(),
-     const SearchBookScreen(),
-    const AdminSettingsScreen(),
+  final Rx<int> selectedIndex = 2.obs;
+
+  final List<Widget> screens = const [
+    AddBooks(),                  // index 0 - Add Books
+    SearchBookScreen(),          // index 1 - Edit
+    Dashboard(),                 // index 2 - Dashboard (default)
+    AdminUserRequestsScreen(),   // index 3 - Requests
+    AdminSettingsScreen(),       // index 4 - Settings
   ];
+
+  Widget get currentScreen => screens[selectedIndex.value];
+
+  void onDestinationSelected(int index) {
+    selectedIndex.value = index;
+  }
+
+  @override
+  void onInit() {
+    super.onInit();
+  }
+
+  @override
+  void onClose() {
+    super.onClose();
+  }
 }

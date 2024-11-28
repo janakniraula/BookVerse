@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 import '../../../../../books/detailScreen/course_book_detail_screen.dart';
 import '../pdfView/pdflist.dart';
 import 'BooksAll.dart';
@@ -13,135 +14,146 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String query = '';
   List<DocumentSnapshot> searchResults = [];
   bool isLoading = false;
   String? userId;
+  Timer? _debounceTimer;
+  final TextEditingController _searchController = TextEditingController();
+  List<DocumentSnapshot> _allBooks = [];
+  bool _isInitialLoading = true;
 
   @override
   void initState() {
     super.initState();
     userId = FirebaseAuth.instance.currentUser?.uid;
+    _loadInitialData();
   }
 
-  Future<void> _deleteSearchedBooks(String userId) async {
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadInitialData() async {
     try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('searchedBooks')
-          .where('userId', isEqualTo: userId)
+      setState(() => _isInitialLoading = true);
+
+      // Cache all books for faster search
+      final snapshot = await _firestore
+          .collection('books')
+          .orderBy('title') // Optional: pre-sort books
           .get();
 
-      // Delete all documents for this user
-      for (var doc in querySnapshot.docs) {
-        await doc.reference.delete();
-      }
+      _allBooks = snapshot.docs;
 
-      print('All previous searches for user $userId deleted successfully.');
+      setState(() => _isInitialLoading = false);
     } catch (e) {
-      print('Error deleting searched books for user $userId: $e');
+      print('Error loading initial data: $e');
+      setState(() => _isInitialLoading = false);
     }
   }
 
+  Future<void> _searchBooks(String searchQuery) async {
+    _debounceTimer?.cancel();
 
-  Future<void> _searchBooks(String query) async {
-    if (query.isEmpty) {
+    if (searchQuery.isEmpty) {
       setState(() {
         searchResults = [];
+        isLoading = false;
       });
       return;
     }
 
-    setState(() {
-      isLoading = true;
-    });
+    // Debounce search to prevent excessive updates
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
+      if (!mounted) return;
 
-    try {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
+      setState(() => isLoading = true);
 
-      if (userId != null) {
-        // Step 1: Delete previous searches for this user
-        await _deleteSearchedBooks(userId);
+      try {
+        final uppercaseQuery = searchQuery.toUpperCase();
 
-        // Step 2: Fetch books matching the search query
-        final uppercaseQuery = query.toUpperCase();
-        final snapshot = await FirebaseFirestore.instance.collection('books').get();
+        // Search in cached books
+        final results = _allBooks.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final title = (data['title'] as String?)?.toUpperCase() ?? '';
+          final writer = (data['writer'] as String?)?.toUpperCase() ?? '';
+          final course = (data['course'] as String?)?.toUpperCase() ?? '';
 
-        // Filter books based on title or writer containing the query
-        final results = snapshot.docs.where((doc) {
-          final data = doc.data();
-          final bookTitle = (data['title'] as String?)?.toUpperCase() ?? '';
-          final bookWriter = (data['writer'] as String?)?.toUpperCase() ?? '';
-          return bookTitle.contains(uppercaseQuery) || bookWriter.contains(uppercaseQuery);
+          return title.contains(uppercaseQuery) ||
+              writer.contains(uppercaseQuery) ||
+              course.contains(uppercaseQuery);
         }).toList();
 
-        // Save results for the user in Firestore
-        if (results.isNotEmpty) {
-          await _saveSearchedBooks(query, userId, results);
+        if (mounted) {
+          setState(() {
+            searchResults = results;
+            isLoading = false;
+          });
         }
 
-        setState(() {
-          searchResults = results;
-        });
-      } else {
-        setState(() {
-          searchResults = [];
-        });
+        // Save search results in background
+        if (results.isNotEmpty && userId != null) {
+          _saveSearchResults(searchQuery, results);
+        }
+
+      } catch (e) {
+        print('Error searching books: $e');
+        if (mounted) {
+          setState(() {
+            searchResults = [];
+            isLoading = false;
+          });
+        }
       }
-    } catch (e) {
-      print('Error searching books: $e');
-      setState(() {
-        searchResults = [];
-      });
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
-    }
+    });
   }
 
-  Future<void> _saveSearchedBooks(String searchQuery, String userId, List<QueryDocumentSnapshot> results) async {
+  Future<void> _saveSearchResults(String searchQuery, List<DocumentSnapshot> results) async {
     try {
-      final batch = FirebaseFirestore.instance.batch();
+      // Manage search history - keep only recent searches
+      final previousSearches = await _firestore
+          .collection('searchedBooks')
+          .where('userId', isEqualTo: userId)
+          .orderBy('searchedAt', descending: true)
+          .limit(10)
+          .get();
 
-      for (var doc in results) { // Use the passed `results` list
-        final bookId = doc.id;
-        final book = doc.data() as Map<String, dynamic>;
-        final title = book['title']?.toString() ?? 'No title';
-        final writer = book['writer']?.toString() ?? 'Unknown author';
-        final imageUrl = book['imageUrl']?.toString() ?? '';
-        final course = book['course']?.toString() ?? '';
-        final summary = book['summary']?.toString() ?? 'No summary available';
+      // Batch operations for better performance
+      final batch = _firestore.batch();
 
-        if (title.trim().toLowerCase() == searchQuery.trim().toLowerCase()) {
-          final existingBookSnapshot = await FirebaseFirestore.instance
-              .collection('searchedBooks')
-              .where('userId', isEqualTo: userId)
-              .where('bookId', isEqualTo: bookId)
-              .get();
-
-          if (existingBookSnapshot.docs.isEmpty) {
-            final docRef = FirebaseFirestore.instance.collection('searchedBooks').doc();
-            batch.set(docRef, {
-              'userId': userId,
-              'bookId': bookId,
-              'title': title,
-              'writer': writer,
-              'imageUrl': imageUrl,
-              'course': course,
-              'summary': summary,
-              'searchedAt': FieldValue.serverTimestamp(),
-            });
-          }
+      // Remove old searches if there are too many
+      if (previousSearches.docs.length >= 10) {
+        for (var doc in previousSearches.docs.sublist(9)) {
+          batch.delete(doc.reference);
         }
       }
+
+      // Add new search result
+      final newSearchRef = _firestore.collection('searchedBooks').doc();
+      final firstResult = results.first.data() as Map<String, dynamic>;
+
+      batch.set(newSearchRef, {
+        'userId': userId,
+        'query': searchQuery,
+        'bookId': results.first.id,
+        'title': firstResult['title'] ?? 'No title',
+        'writer': firstResult['writer'] ?? 'Unknown author',
+        'imageUrl': firstResult['imageUrl'] ?? '',
+        'course': firstResult['course'] ?? '',
+        'summary': firstResult['summary'] ?? 'No summary available',
+        'searchedAt': FieldValue.serverTimestamp(),
+      });
 
       await batch.commit();
-      print('All matching books saved successfully.');
     } catch (e) {
-      print('Failed to save searched books: $e');
+      print('Error saving search results: $e');
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -152,114 +164,190 @@ class _SearchScreenState extends State<SearchScreen> {
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),
             color: Colors.green,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AllPDFsScreen()),
-              );
-            },
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AllPDFsScreen()),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.menu_book),
             color: Colors.green,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AllBooksScreen()),
-              );
-            },
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AllBooksScreen()),
+            ),
           ),
-
-
         ],
       ),
-      body: Column(
+      body: _isInitialLoading
+          ? const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading books...'),
+          ],
+        ),
+      )
+          : Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
-              onChanged: (value) {
-                setState(() {
-                  query = value;
-                });
-                _searchBooks(value);
-              },
+              controller: _searchController,
+              onChanged: _searchBooks,
               decoration: InputDecoration(
-                labelText: 'Search',
+                labelText: 'Search books by title, author, or course',
+                hintText: 'Enter your search term',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(30.0),
                 ),
                 prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                    _searchBooks('');
+                  },
+                )
+                    : null,
               ),
             ),
           ),
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : Expanded(
-            child: searchResults.isEmpty
-                ? const Center(
-              child: Text(
-                'No results found',
-                style: TextStyle(fontSize: 18, color: Colors.grey),
+          Expanded(
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : searchResults.isEmpty && _searchController.text.isNotEmpty
+                ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.search_off,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No results found for "${_searchController.text}"',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             )
                 : ListView.builder(
               itemCount: searchResults.length,
               itemBuilder: (context, index) {
                 final book = searchResults[index].data() as Map<String, dynamic>;
-
-                final title = book['title'] ?? 'No title';
-                final writer = book['writer'] ?? 'Unknown author';
-                final imageUrl = book['imageUrl'] ?? '';
-                final course = book['course'] ?? '';
-                final summary = book['summary'] ?? 'No summary available';
-
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 3,
-                  child: ListTile(
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(8.0),
-                      child: imageUrl.isEmpty
-                          ? const Icon(Icons.book, size: 50)
-                          : Image.network(
-                        imageUrl,
-                        width: 50,
-                        height: 70,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.book, size: 50);
-                        },
-                      ),
-                    ),
-                    title: Text(
-                      title,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(writer),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => CourseBookDetailScreen(
-                            title: title,
-                            writer: writer,
-                            imageUrl: imageUrl,
-                            course: course,
-                            summary: summary,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                );
+                return _buildBookCard(book);
               },
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBookCard(Map<String, dynamic> book) {
+    final title = book['title'] ?? 'No title';
+    final writer = book['writer'] ?? 'Unknown author';
+    final imageUrl = book['imageUrl'] ?? '';
+    final course = book['course'] ?? '';
+    final summary = book['summary'] ?? 'No summary available';
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      elevation: 3,
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CourseBookDetailScreen(
+              title: title,
+              writer: writer,
+              imageUrl: imageUrl,
+              course: course,
+              summary: summary,
+            ),
+          ),
+        ),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8.0),
+                child: imageUrl.isNotEmpty
+                    ? Image.network(
+                  imageUrl,
+                  width: 80,
+                  height: 120,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return _buildPlaceholderImage();
+                  },
+                )
+                    : _buildPlaceholderImage(),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      writer,
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      course,
+                      style: TextStyle(
+                        color: Colors.green[700],
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderImage() {
+    return Container(
+      width: 80,
+      height: 120,
+      color: Colors.grey[300],
+      child: const Icon(
+        Icons.book,
+        size: 40,
+        color: Colors.grey,
       ),
     );
   }

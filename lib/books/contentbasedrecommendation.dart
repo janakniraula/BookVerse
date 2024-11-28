@@ -1,7 +1,8 @@
+import 'package:carousel_slider/carousel_slider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:carousel_slider/carousel_slider.dart';
+
 import '../common/widgets/texts/section_heading.dart';
 import 'detailScreen/course_book_detail_screen.dart';
 
@@ -9,10 +10,10 @@ class ContentBasedAlgorithm extends StatefulWidget {
   const ContentBasedAlgorithm({super.key});
 
   @override
-  _ContentBasedAlgorithm createState() => _ContentBasedAlgorithm();
+  State<ContentBasedAlgorithm> createState() => _ContentBasedAlgorithmState();
 }
 
-class _ContentBasedAlgorithm extends State<ContentBasedAlgorithm> {
+class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   List<Map<String, dynamic>> _popularBooks = [];
   bool _isLoading = true;
@@ -20,57 +21,72 @@ class _ContentBasedAlgorithm extends State<ContentBasedAlgorithm> {
   @override
   void initState() {
     super.initState();
-    _fetchRecommendedBooks();
+    _fetchCombinedRecommendations();
   }
 
-  Future<void> _fetchRecommendedBooks() async {
+  Future<void> _fetchCombinedRecommendations() async {
     try {
-      setState(() {
-        _isLoading = true;
-      });
-
+      setState(() => _isLoading = true);
       final userId = FirebaseAuth.instance.currentUser?.uid;
+
       if (userId == null) {
         print('No user logged in.');
-        setState(() {
-          _isLoading = false;
-          _popularBooks = [];
-        });
+        _updateState([], false);
         return;
       }
 
-      // Step 1: Fetch the most recent searched book by the user
+      // Get recommendations from both systems
+      final authorBasedBooks = await _fetchAuthorBasedRecommendations(userId);
+      final recentBooks = await _getRecommendedBooks(userId);
+
+      // Combine both lists and remove duplicates
+      final Set<Map<String, dynamic>> combinedBooks = {};
+      combinedBooks.addAll(authorBasedBooks);
+      combinedBooks.addAll(recentBooks);
+
+      if (combinedBooks.isEmpty) {
+        final fallbackBooks = await _getFallbackBooks();
+        _updateState(fallbackBooks, false);
+        return;
+      }
+
+      _updateState(combinedBooks.toList(), false);
+    } catch (e) {
+      print('Error in recommendation system: $e');
+      try {
+        final fallbackBooks = await _getFallbackBooks();
+        _updateState(fallbackBooks, false);
+      } catch (fallbackError) {
+        print('Error getting fallback books: $fallbackError');
+        _updateState([], false);
+      }
+    }
+  }
+
+  // Original author-based recommendation system
+  Future<List<Map<String, dynamic>>> _fetchAuthorBasedRecommendations(
+      String userId) async {
+    try {
       final searchedBooksSnapshot = await _firestore
           .collection('searchedBooks')
-          .where('userId', isEqualTo: userId) // Filter by current user
+          .where('userId', isEqualTo: userId)
           .orderBy('searchedAt', descending: true)
           .limit(7)
           .get();
 
       if (searchedBooksSnapshot.docs.isEmpty) {
-        print('No searched books found.');
-        setState(() {
-          _isLoading = false;
-          _popularBooks = [];
-        });
-        return;
+        return [];
       }
 
       final searchedBook = searchedBooksSnapshot.docs.first.data();
       final searchedAuthor = searchedBook['writer']?.trim();
 
       if (searchedAuthor == null || searchedAuthor.isEmpty) {
-        print('No author found for the searched book.');
-        setState(() {
-          _isLoading = false;
-          _popularBooks = [];
-        });
-        return;
+        return [];
       }
 
-      // Step 2: Fetch all bookmarks by the same author for this user
       final bookmarksByAuthorSnapshot = await _firestore
-          .collection('bookmarks')// Filter by current user
+          .collection('bookmarks')
           .where('writer', isEqualTo: searchedAuthor)
           .get();
 
@@ -80,55 +96,145 @@ class _ContentBasedAlgorithm extends State<ContentBasedAlgorithm> {
           .toSet();
 
       if (bookmarkedBookIds.isEmpty) {
-        print('No bookmarked book IDs found.');
-        setState(() {
-          _isLoading = false;
-          _popularBooks = [];
-        });
-        return;
+        return [];
       }
 
-      // Step 3: Fetch book details for the bookmarked IDs
       final recommendedBooks = await Future.wait(
         bookmarkedBookIds.map((bookId) async {
-          final bookDoc = await _firestore.collection('books').doc(bookId).get();
+          final bookDoc =
+              await _firestore.collection('books').doc(bookId).get();
           return bookDoc.exists ? bookDoc.data() as Map<String, dynamic> : null;
         }),
       );
 
-      setState(() {
-        _popularBooks = recommendedBooks.whereType<Map<String, dynamic>>().toList();
-      });
+      return recommendedBooks.whereType<Map<String, dynamic>>().toList();
     } catch (e) {
-      print('Error fetching recommended books: $e');
-      setState(() {
-        _popularBooks = [];
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      print('Error in author-based recommendations: $e');
+      return [];
     }
   }
 
+  // New recommendation system based on user's search history
+  Future<List<Map<String, dynamic>>> _getRecommendedBooks(String userId) async {
+    try {
+      // Get user's recent searches
+      final searchedBooksSnapshot = await _firestore
+          .collection('searchedBooks')
+          .where('userId', isEqualTo: userId)
+          .orderBy('searchedAt', descending: true)
+          .limit(5)
+          .get();
 
+      if (searchedBooksSnapshot.docs.isEmpty) {
+        print('No search history found');
+        return [];
+      }
+
+      // Extract authors from searched books
+      final searchedBooks = searchedBooksSnapshot.docs.map((doc) => doc.data());
+      final preferredAuthors = searchedBooks
+          .map((book) => book['writer']?.toString().trim())
+          .where((author) => author != null && author.isNotEmpty)
+          .toSet();
+
+      if (preferredAuthors.isEmpty) {
+        return [];
+      }
+
+      // Get recommendations based on preferred authors
+      final recommendationsQuery = await _firestore
+          .collection('books')
+          .where('writer', whereIn: preferredAuthors.take(10).toList())
+          .limit(10)
+          .get();
+
+      final Set<Map<String, dynamic>> recommendations = {};
+
+      for (var doc in recommendationsQuery.docs) {
+        recommendations.add(_processBookData(doc.data(), doc.id));
+      }
+
+      return recommendations.toList();
+    } catch (e) {
+      print('Error getting recommendations: $e');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _getFallbackBooks() async {
+    try {
+      // Get recent books as fallback
+      final fallbackBooksSnapshot = await _firestore
+          .collection('books')
+          .orderBy('createdAt', descending: true)
+          .limit(10)
+          .get();
+
+      if (fallbackBooksSnapshot.docs.isEmpty) {
+        // If no books with createdAt, just get any books
+        final anyBooksSnapshot =
+            await _firestore.collection('books').limit(10).get();
+
+        return anyBooksSnapshot.docs
+            .map((doc) => _processBookData(doc.data(), doc.id))
+            .toList();
+      }
+
+      return fallbackBooksSnapshot.docs
+          .map((doc) => _processBookData(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      print('Error getting fallback books: $e');
+      return [];
+    }
+  }
+
+  Map<String, dynamic> _processBookData(Map<String, dynamic> data, String id) {
+    return {
+      'id': id,
+      'title': data['title'] ?? 'Unknown Title',
+      'writer': data['writer'] ?? 'Unknown Author',
+      'imageUrl': data['imageUrl'] ?? '',
+      'course': data['course'] ?? '',
+      'summary': data['summary'] ?? 'No summary available',
+    };
+  }
+
+  void _updateState(List<Map<String, dynamic>> books, bool loading) {
+    setState(() {
+      _popularBooks = books;
+      _isLoading = loading;
+    });
+  }
 
   void _navigateToDetailPage(Map<String, dynamic> book) {
-    final title = book['title'] ?? 'Unknown Title';
-    final writer = book['writer'] ?? 'Unknown Writer';
-    final imageUrl = book['imageUrl'] ?? 'https://example.com/placeholder.jpg'; // Placeholder
-    final course = book['course'] ?? 'No course info available';
-    final summary = book['summary'] ?? 'No summary available';
-
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => CourseBookDetailScreen(
-          title: title,
-          writer: writer,
-          imageUrl: imageUrl,
-          course: course,
-          summary: summary,
+          title: book['title'],
+          writer: book['writer'],
+          imageUrl: book['imageUrl'],
+          course: book['course'],
+          summary: book['summary'],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      width: 150,
+      height: 220,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.book,
+          size: 50,
+          color: Colors.grey,
         ),
       ),
     );
@@ -142,38 +248,49 @@ class _ContentBasedAlgorithm extends State<ContentBasedAlgorithm> {
         TSectionHeading(
           title: '| Popular Books',
           fontSize: 25,
-          onPressed: () {
-            // Handle view all button press
-          },
+          onPressed: _fetchCombinedRecommendations,
         ),
         const SizedBox(height: 10),
-        _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _popularBooks.isEmpty
-            ? const Center(child: Text('No popular books found.'))
-            : SizedBox(
-          height: 300, // Set a fixed height for the carousel
-          child: CarouselSlider.builder(
-            itemCount: _popularBooks.length,
-            itemBuilder: (context, index, realIndex) {
-              final book = _popularBooks[index];
-              final imageUrl = book['imageUrl'] ?? 'https://example.com/placeholder.jpg';
-              final title = book['title'] ?? 'Unknown Title';
-              final writer = book['writer'] ?? 'Unknown Writer';
+        if (_isLoading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (_popularBooks.isEmpty)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: Text(
+                'No popular books found.',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 300,
+            child: CarouselSlider.builder(
+              itemCount: _popularBooks.length,
+              itemBuilder: (context, index, realIndex) {
+                final book = _popularBooks[index];
+                final imageUrl = book['imageUrl'];
+                final title = book['title'];
+                final writer = book['writer'];
 
-              return GestureDetector(
-                onTap: () => _navigateToDetailPage(book),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 5),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min, // Make Column size flexible
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(20), // Increased border radius
-                          child: Container(
-                            decoration: const BoxDecoration(
-                              boxShadow: [
+                return GestureDetector(
+                  onTap: () => _navigateToDetailPage(book),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 5),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: const [
                                 BoxShadow(
                                   color: Colors.black26,
                                   blurRadius: 8,
@@ -182,56 +299,63 @@ class _ContentBasedAlgorithm extends State<ContentBasedAlgorithm> {
                                 ),
                               ],
                             ),
-                            child: Image.network(
-                              imageUrl,
-                              width: 150,
-                              height: 220,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Center(
-                                  child: Text(
-                                    'Image not available',
-                                    style: TextStyle(color: Colors.red),
-                                  ),
-                                );
-                              },
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: imageUrl.isNotEmpty
+                                  ? Image.network(
+                                      imageUrl,
+                                      width: 150,
+                                      height: 220,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        print('Image Error: $error');
+                                        return _buildPlaceholder();
+                                      },
+                                    )
+                                  : _buildPlaceholder(),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                          const SizedBox(height: 10),
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          writer,
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
+                          const SizedBox(height: 5),
+                          Text(
+                            writer,
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
-            options: CarouselOptions(
-              height: 300,
-              viewportFraction: 0.5, // Show two items side by side
-              enlargeCenterPage: false,
-              aspectRatio: 2.0,
-              autoPlay: false,
-              enableInfiniteScroll: true,
+                );
+              },
+              options: CarouselOptions(
+                height: 300,
+                viewportFraction: 0.5,
+                enlargeCenterPage: true,
+                enableInfiniteScroll: _popularBooks.length > 1,
+                autoPlay: _popularBooks.length > 1,
+                autoPlayInterval: const Duration(seconds: 3),
+                autoPlayAnimationDuration: const Duration(milliseconds: 800),
+                autoPlayCurve: Curves.fastOutSlowIn,
+              ),
             ),
           ),
-        ),
       ],
     );
   }

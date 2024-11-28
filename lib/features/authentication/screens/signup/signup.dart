@@ -29,11 +29,6 @@ class SignUpScreen extends StatelessWidget {
               /// Form with the unique GlobalKey
               TSignupform(formKey: signupFormKey),
 
-              /// -- Divider
-              const SizedBox(height: TSizes.spaceBtwSections),
-
-              /// -- Social Buttons
-              const TSocialButtons(),
             ],
           ),
         ),

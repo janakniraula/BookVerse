@@ -32,12 +32,6 @@ class LoginScreen extends StatelessWidget {
                 /// Form with the unique GlobalKey
                 TLoginForm(formKey: loginFormKey),
 
-                /// -- Divider
-                const TFormDivider(dividerText: TTexts.orSignInWith),
-                const SizedBox(height: TSizes.spaceBtwSections),
-
-                /// -- Footer
-                const TSocialButtons()
               ],
             ),
           ),

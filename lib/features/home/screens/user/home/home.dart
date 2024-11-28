@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:iconsax/iconsax.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../../books/contentbasedrecommendation.dart';
 import '../../../../../books/detailScreen/genre_book_detail_screen.dart';
@@ -127,6 +130,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 4),
+            Text(
+              '${_courseBooks[grade]?.length ?? 0} Books',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withOpacity(0.8),
+              ),
+            ),
           ],
         ),
       ),
@@ -134,6 +145,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildGenreCard(String genre) {
+    final genreIcons = {
+      'FICTION': Icons.auto_stories,
+      'ADVENTURE': Icons.hiking,
+      'SCI-FI': Icons.rocket,
+      'MYSTERY': Icons.search,
+      'LITERATURE': Icons.library_books,
+      'EMOTIONAL': Icons.favorite,
+      'FANTASY': Icons.auto_fix_high,
+      'DARK': Icons.dark_mode,
+      'ROMANCE': Icons.favorite_border,
+      'DRAMA': Icons.theater_comedy,
+    };
+
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -142,33 +166,59 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Colors.green, Colors.greenAccent],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+          gradient: LinearGradient(
+            colors: [
+              Colors.green.shade600,
+              Colors.green.shade400,
+            ],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.4),
-              spreadRadius: 2,
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Center(
-          child: Text(
-            genre,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              genreIcons[genre.toUpperCase()] ?? Icons.book,
+              size: 20,
               color: Colors.white,
-              letterSpacing: 1.1,
             ),
-            textAlign: TextAlign.center,
-          ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    genre,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  Text(
+                    '${_genreBooks[genre]?.length ?? 0}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white.withOpacity(0.9),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -235,7 +285,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: () {
-        // Hide keyboard and remove focus from any text field
         FocusScope.of(context).unfocus();
         FocusManager.instance.primaryFocus?.unfocus();
       },
@@ -246,7 +295,6 @@ class _HomeScreenState extends State<HomeScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
               children: [
-                // Header
                 const TPrimaryHeaderContainer(
                   child: Column(
                     children: [
@@ -256,20 +304,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
-
-                // Body
                 if (_isLoading)
                   _buildLoadingState()
                 else if (_error != null)
                   _buildErrorState()
                 else
                   Padding(
-                    padding: const EdgeInsets.all(TSizes.cardRadiusSm),
+                    padding: const EdgeInsets.all(TSizes.defaultSpace),
                     child: Column(
                       children: [
                         // Recommendations Section
                         const ContentBasedAlgorithm(),
+                        const SizedBox(height: TSizes.spaceBtwSections),
                         const Divider(),
+                        const SizedBox(height: TSizes.spaceBtwItems),
 
                         // Course Books Section
                         TSectionHeading(
@@ -277,11 +325,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           fontSize: 25,
                           onPressed: () {},
                         ),
+                        const SizedBox(height: TSizes.spaceBtwItems),
                         _buildSectionGrid(
                           items: _courseBooks,
                           cardBuilder: _buildGradeCard,
                           childAspectRatio: 4 / 3,
                         ),
+                        const SizedBox(height: TSizes.spaceBtwSections),
                         const Divider(),
                         const SizedBox(height: TSizes.spaceBtwItems),
 
@@ -291,11 +341,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           fontSize: 25,
                           onPressed: () {},
                         ),
+                        const SizedBox(height: TSizes.spaceBtwItems),
                         _buildSectionGrid(
                           items: _genreBooks,
                           cardBuilder: _buildGenreCard,
-                          childAspectRatio: 3,
+                          childAspectRatio: 2.5,
                         ),
+                        const SizedBox(height: TSizes.spaceBtwSections),
                       ],
                     ),
                   ),
@@ -305,5 +357,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 }

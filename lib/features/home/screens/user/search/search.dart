@@ -5,6 +5,7 @@ import 'dart:async';
 import '../../../../../books/detailScreen/course_book_detail_screen.dart';
 import '../pdfView/pdflist.dart';
 import 'BooksAll.dart';
+import 'package:book_Verse/features/home/screens/user/home/widget/browse_books.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -15,12 +16,14 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+
   String query = '';
   List<DocumentSnapshot> searchResults = [];
   bool isLoading = false;
   String? userId;
   Timer? _debounceTimer;
-  final TextEditingController _searchController = TextEditingController();
   List<DocumentSnapshot> _allBooks = [];
   bool _isInitialLoading = true;
 
@@ -35,6 +38,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void dispose() {
     _debounceTimer?.cancel();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -42,15 +46,15 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       setState(() => _isInitialLoading = true);
 
-      // Cache all books for faster search
       final snapshot = await _firestore
           .collection('books')
-          .orderBy('title') // Optional: pre-sort books
+          .orderBy('title')
           .get();
 
-      _allBooks = snapshot.docs;
-
-      setState(() => _isInitialLoading = false);
+      setState(() {
+        _allBooks = snapshot.docs;
+        _isInitialLoading = false;
+      });
     } catch (e) {
       print('Error loading initial data: $e');
       setState(() => _isInitialLoading = false);
@@ -68,7 +72,6 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
 
-    // Debounce search to prevent excessive updates
     _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
       if (!mounted) return;
 
@@ -77,7 +80,6 @@ class _SearchScreenState extends State<SearchScreen> {
       try {
         final uppercaseQuery = searchQuery.toUpperCase();
 
-        // Search in cached books
         final results = _allBooks.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final title = (data['title'] as String?)?.toUpperCase() ?? '';
@@ -96,11 +98,9 @@ class _SearchScreenState extends State<SearchScreen> {
           });
         }
 
-        // Save search results in background
         if (results.isNotEmpty && userId != null) {
           _saveSearchResults(searchQuery, results);
         }
-
       } catch (e) {
         print('Error searching books: $e');
         if (mounted) {
@@ -115,7 +115,6 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _saveSearchResults(String searchQuery, List<DocumentSnapshot> results) async {
     try {
-      // Manage search history - keep only recent searches
       final previousSearches = await _firestore
           .collection('searchedBooks')
           .where('userId', isEqualTo: userId)
@@ -123,17 +122,14 @@ class _SearchScreenState extends State<SearchScreen> {
           .limit(10)
           .get();
 
-      // Batch operations for better performance
       final batch = _firestore.batch();
 
-      // Remove old searches if there are too many
       if (previousSearches.docs.length >= 10) {
         for (var doc in previousSearches.docs.sublist(9)) {
           batch.delete(doc.reference);
         }
       }
 
-      // Add new search result
       final newSearchRef = _firestore.collection('searchedBooks').doc();
       final firstResult = results.first.data() as Map<String, dynamic>;
 
@@ -157,110 +153,113 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Search Books'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf),
-            color: Colors.green,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AllPDFsScreen()),
+    return GestureDetector(
+      onTap: () {
+        _searchFocusNode.unfocus();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Search Books'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf),
+              color: Colors.green,
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AllPDFsScreen()),
+              ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.menu_book),
-            color: Colors.green,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AllBooksScreen()),
+            IconButton(
+              icon: const Icon(Icons.menu_book),
+              color: Colors.green,
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AllBooksScreen()),
+              ),
             ),
-          ),
-        ],
-      ),
-      body: _isInitialLoading
-          ? const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Loading books...'),
           ],
         ),
-      )
-          : Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _searchBooks,
-              decoration: InputDecoration(
-                labelText: 'Search books by title, author, or course',
-                hintText: 'Enter your search term',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30.0),
+        body: _isInitialLoading
+            ? const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading books...'),
+            ],
+          ),
+        )
+            : Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                onChanged: _searchBooks,
+                decoration: InputDecoration(
+                  labelText: 'Search books by title, author, or course',
+                  hintText: 'Enter your search term',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30.0),
+                  ),
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      _searchController.clear();
+                      _searchBooks('');
+                      _searchFocusNode.unfocus();
+                    },
+                  )
+                      : null,
                 ),
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _searchController.clear();
-                    _searchBooks('');
-                  },
-                )
-                    : null,
               ),
             ),
-          ),
-          Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : searchResults.isEmpty && _searchController.text.isNotEmpty
-                ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.search_off,
-                    size: 64,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No results found for "${_searchController.text}"',
-                    style: const TextStyle(
-                      fontSize: 16,
+            Expanded(
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _searchController.text.isEmpty
+                  ? const BrowseBooks()
+                  : searchResults.isEmpty
+                  ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.search_off,
+                      size: 64,
                       color: Colors.grey,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    Text(
+                      'No results found for "${_searchController.text}"',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              )
+                  : ListView.builder(
+                itemCount: searchResults.length,
+                itemBuilder: (context, index) {
+                  final book = searchResults[index].data() as Map<String, dynamic>;
+                  return _buildBookCard(book);
+                },
               ),
-            )
-                : ListView.builder(
-              itemCount: searchResults.length,
-              itemBuilder: (context, index) {
-                final book = searchResults[index].data() as Map<String, dynamic>;
-                return _buildBookCard(book);
-              },
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildBookCard(Map<String, dynamic> book) {
-    final title = book['title'] ?? 'No title';
-    final writer = book['writer'] ?? 'Unknown author';
-    final imageUrl = book['imageUrl'] ?? '';
-    final course = book['course'] ?? '';
-    final summary = book['summary'] ?? 'No summary available';
-
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       shape: RoundedRectangleBorder(
@@ -272,11 +271,11 @@ class _SearchScreenState extends State<SearchScreen> {
           context,
           MaterialPageRoute(
             builder: (context) => CourseBookDetailScreen(
-              title: title,
-              writer: writer,
-              imageUrl: imageUrl,
-              course: course,
-              summary: summary,
+              title: book['title'] ?? 'No title',
+              writer: book['writer'] ?? 'Unknown author',
+              imageUrl: book['imageUrl'] ?? '',
+              course: book['course'] ?? '',
+              summary: book['summary'] ?? 'No summary available',
             ),
           ),
         ),
@@ -287,9 +286,9 @@ class _SearchScreenState extends State<SearchScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(8.0),
-                child: imageUrl.isNotEmpty
+                child: book['imageUrl']?.isNotEmpty == true
                     ? Image.network(
-                  imageUrl,
+                  book['imageUrl']!,
                   width: 80,
                   height: 120,
                   fit: BoxFit.cover,
@@ -305,7 +304,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
+                      book['title'] ?? 'No title',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -315,7 +314,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      writer,
+                      book['writer'] ?? 'Unknown author',
                       style: const TextStyle(
                         color: Colors.grey,
                         fontSize: 14,
@@ -323,7 +322,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      course,
+                      book['course'] ?? '',
                       style: TextStyle(
                         color: Colors.green[700],
                         fontSize: 14,

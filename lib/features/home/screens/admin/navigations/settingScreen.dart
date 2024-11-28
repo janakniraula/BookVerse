@@ -17,29 +17,25 @@ import '../notification/notificationScreen.dart';
 
 class AdminSettingsScreen extends StatelessWidget {
   const AdminSettingsScreen({super.key});
+  final Color lightGreen = const Color(0xFF0C8904); // Updated to match dashboard
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(
-          mainAxisSize: MainAxisSize.min, // Add this to avoid conflicting constraints
+          mainAxisSize: MainAxisSize.min,
           children: [
-            ///----> Header
             TPrimaryHeaderContainer(
               child: Column(
                 children: [
-                  ///----> App Bar
                   TAppBar(
                     title: Text(
                       'Settings',
                       style: Theme.of(context).textTheme.headlineMedium!.apply(color: Colors.white),
                     ),
                   ),
-
-                  ///----> UserProfile
                   TAdminProfileTitle(onPressed: () => Get.to(() => const AdminScreen())),
-
                   const SizedBox(height: TSizes.spaceBtwSections),
                 ],
               ),
@@ -50,12 +46,12 @@ class AdminSettingsScreen extends StatelessWidget {
                 children: [
                   ListView(
                     shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(), // Prevent scrolling inside scrollable
+                    physics: const NeverScrollableScrollPhysics(),
                     children: [
                       const TSectionHeading(title: 'Features', showActionButton: false,),
                       _buildSettingItem(
                         context,
-                        icon: Iconsax.bookmark,
+                        icon: Iconsax.notification,
                         title: 'Notification',
                         subTitle: 'Send Notification to Users',
                         onTap: () => Get.to(() => const NotificationScreen()),
@@ -63,7 +59,7 @@ class AdminSettingsScreen extends StatelessWidget {
                       const Divider(),
                       _buildSettingItem(
                         context,
-                        icon: Iconsax.archive_tick,
+                        icon: Iconsax.book_1,
                         title: 'Issued Books',
                         subTitle: 'List books that the Librarian has Issued',
                         onTap: () => Get.to(() => const UsersListScreen()),
@@ -71,15 +67,15 @@ class AdminSettingsScreen extends StatelessWidget {
                       const Divider(),
                       _buildSettingItem(
                         context,
-                        icon: Iconsax.receipt,
+                        icon: Iconsax.document_upload,
                         title: 'Request List',
                         subTitle: 'Books that to be Issued',
-                        onTap: () => Get.to(() =>  const AdminUserRequestsScreen()),
+                        onTap: () => Get.to(() => const AdminUserRequestsScreen()),
                       ),
                       const Divider(),
                       _buildSettingItem(
                         context,
-                        icon: Iconsax.alarm,
+                        icon: Iconsax.timer_1,
                         title: 'Book Return',
                         subTitle: 'List books that the user has to return',
                         onTap: () => Get.to(() => const AcceptReturnUsersScreen()),
@@ -87,7 +83,7 @@ class AdminSettingsScreen extends StatelessWidget {
                       const Divider(),
                       _buildSettingItem(
                         context,
-                        icon: Iconsax.export,
+                        icon: Iconsax.data,
                         title: 'DATA',
                         subTitle: 'DATA available here',
                         onTap: () => Get.to(() => const UserListPage()),
@@ -98,7 +94,7 @@ class AdminSettingsScreen extends StatelessWidget {
                         icon: Iconsax.search_normal,
                         title: 'Search Screen',
                         subTitle: 'Search Books',
-                        onTap: () => Get.to(() =>  const SearchBookScreen()),
+                        onTap: () => Get.to(() => const SearchBookScreen()),
                       ),
                       const Divider(),
                       const SizedBox(height: TSizes.spaceBtwSections),
@@ -108,7 +104,7 @@ class AdminSettingsScreen extends StatelessWidget {
                         },
                         style: ElevatedButton.styleFrom(
                           foregroundColor: Colors.white,
-                          backgroundColor: Colors.green,
+                          backgroundColor: lightGreen,
                           padding: const EdgeInsets.symmetric(vertical: 16.0),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8.0),
@@ -128,19 +124,54 @@ class AdminSettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSettingItem(BuildContext context, {required IconData icon, required String title, required String subTitle, required VoidCallback onTap}) {
+  Widget _buildSettingItem(BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subTitle,
+    required VoidCallback onTap
+  }) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
       child: ListTile(
-        leading: Icon(icon, color: Theme.of(context).primaryColor),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subTitle),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: lightGreen.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: lightGreen, size: 24),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        subtitle: Text(
+          subTitle,
+          style: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 12,
+          ),
+        ),
+        trailing: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: lightGreen.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            Icons.arrow_forward_ios,
+            color: lightGreen,
+            size: 16,
+          ),
+        ),
         onTap: onTap,
       ),
     );
   }
 
-  ///---> Confirmation Logout Button
   void _showLogoutConfirmationDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -150,13 +181,19 @@ class AdminSettingsScreen extends StatelessWidget {
           content: const Text('Are you sure you want to logout?'),
           actions: <Widget>[
             TextButton(
-              child: const Text('Cancel'),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: lightGreen),
+              ),
               onPressed: () {
                 Navigator.of(context).pop();
               },
             ),
             TextButton(
-              child: const Text('Confirm'),
+              child: Text(
+                'Confirm',
+                style: TextStyle(color: lightGreen),
+              ),
               onPressed: () {
                 Get.find<AdminAuthenticationRepository>().logout();
                 Navigator.of(context).pop();

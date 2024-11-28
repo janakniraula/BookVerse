@@ -1,4 +1,5 @@
 import 'package:book_Verse/features/home/screens/admin/widgets/adminappbar.dart';
+import 'package:book_Verse/utils/constants/colors.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../../../common/widgets/custom_shapes/primary_header_container.dart';
@@ -12,11 +13,13 @@ class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
 
   @override
-  _DashboardState createState() => _DashboardState();
+  State<Dashboard> createState() => _DashboardState();
 }
 
 class _DashboardState extends State<Dashboard> {
+  final _firestore = FirebaseFirestore.instance;
   late Future<List<QuerySnapshot>> _futureData;
+  final Color lightGreen = const Color(0xFF0C8904);
 
   @override
   void initState() {
@@ -26,70 +29,162 @@ class _DashboardState extends State<Dashboard> {
 
   void _loadData() {
     _futureData = Future.wait([
-      FirebaseFirestore.instance.collection('books').get(),
-      FirebaseFirestore.instance.collection('Users').get(),
-      FirebaseFirestore.instance.collection('issuedBooks').get(),
-      FirebaseFirestore.instance.collection('toBeReturnedBooks').get(),
+      _firestore.collection('books').get(),
+      _firestore.collection('Users').get(),
+      _firestore.collection('issuedBooks').get(),
+      _firestore.collection('toBeReturnedBooks').get(),
+      _firestore.collection('notifications').get(),
     ]);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[200],
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Header section
-            const TPrimaryHeaderContainer(
+      backgroundColor: Colors.black,
+      body: RefreshIndicator(
+        color: lightGreen,
+        onRefresh: () async => setState(() => _loadData()),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              const TPrimaryHeaderContainer(
+                child: Column(
+                  children: [
+                    SizedBox(height: TSizes.sm),
+                    TAdminAppBar(),
+                    SizedBox(height: TSizes.spaceBtwSections),
+                  ],
+                ),
+              ),
+              _buildDashboardContent(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardContent() {
+    return FutureBuilder<List<QuerySnapshot>>(
+      future: _futureData,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: CircularProgressIndicator(color: TColors.primaryColor),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
               child: Column(
                 children: [
-                  SizedBox(height: TSizes.sm),
-                  TAdminAppBar(),
-                  SizedBox(height: TSizes.spaceBtwSections),
+                  Text(
+                    'Error loading data',
+                    style: TextStyle(color: TColors.error),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => setState(() => _loadData()),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: lightGreen,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Retry'),
+                  ),
                 ],
               ),
             ),
+          );
+        }
 
-            // Dashboard content
-            FutureBuilder<List<QuerySnapshot>>(
-              future: _futureData,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+        final [books, users, issuedBooks, returnedBooks, notifications] = snapshot.data!;
 
-                if (snapshot.hasError) {
-                  return const Center(child: Text('Something went wrong'));
-                }
+        return Container(
+          color: Colors.black,
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildStatCard(
+                'Total Books',
+                Icons.book,
+                books.size.toString(),
+                const AllBooksScreenAdmin(),
+              ),
+              _buildStatCard(
+                'Total Users',
+                Icons.people,
+                users.size.toString(),
+                const AllUsersScreen(),
+              ),
+              _buildNotificationsSection(context, notifications.size),
+              _buildIssuedBooksSection(issuedBooks.docs),
+              _buildReturnedBooksSection(returnedBooks.docs),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-                if (!snapshot.hasData) {
-                  return const Center(child: Text('No data found'));
-                }
-
-                final booksSnapshot = snapshot.data![0];
-                final usersSnapshot = snapshot.data![1];
-                final issuedBooksSnapshot = snapshot.data![2];
-                final returnedBooksSnapshot = snapshot.data![3];
-
-                final totalBooks = booksSnapshot.size;
-                final totalUsers = usersSnapshot.size;
-                final issuedBooks = issuedBooksSnapshot.docs;
-                final toBeReturnedBooks = returnedBooksSnapshot.docs;
-
-                return Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      _buildStatCard('Total Books', Icons.book, totalBooks.toString(), context, const AllBooksScreenAdmin()),
-                      _buildStatCard('Total Users', Icons.people, totalUsers.toString(), context, const AllUsersScreen()),
-                      _buildNotificationsCard(),
-                      _buildIssuedBooksCard(issuedBooks, context),
-                      _buildReturnedBooksCard(toBeReturnedBooks, context),
-                    ],
+  Widget _buildStatCard(String title, IconData icon, String value, Widget destination) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => destination),
+      ),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: lightGreen.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: lightGreen, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                );
-              },
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: lightGreen,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.grey,
+              size: 20,
             ),
           ],
         ),
@@ -97,213 +192,272 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  Widget _buildStatCard(String title, IconData icon, String value, BuildContext context, [Widget? navigateTo]) {
-    return GestureDetector(
-      onTap: () {
-        if (navigateTo != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => navigateTo),
-          );
-        }
-      },
-      child: Card(
-        color: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        elevation: 3,
-        child: ListTile(
-          contentPadding: const EdgeInsets.all(16),
-          leading: Icon(icon, color: Colors.blueAccent),
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-          trailing: Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+  Widget _buildNotificationsSection(BuildContext context, int notificationCount) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+        ),
+        child: StreamBuilder<QuerySnapshot>(
+          stream: _firestore.collection('notifications')
+              .orderBy('timestamp', descending: true)
+              .limit(5)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final notifications = snapshot.data!.docs;
+            return ExpansionTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: lightGreen.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.notifications, color: lightGreen, size: 20),
+              ),
+              tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              backgroundColor: Colors.transparent,
+              collapsedBackgroundColor: Colors.transparent,
+              title: Row(
+                children: [
+                  Text(
+                    'Recent Notifications',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: lightGreen.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      notificationCount.toString(),
+                      style: TextStyle(
+                        color: lightGreen,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              children: [
+                Container(
+                  color: Colors.black,
+                  constraints: BoxConstraints(
+                    maxHeight: notifications.length > 3 ? 200 : notifications.length * 72.0,
+                    minHeight: 0,
+                  ),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: notifications.length,
+                    itemBuilder: (context, index) {
+                      final data = notifications[index].data() as Map<String, dynamic>;
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        title: Text(
+                          data['message'] ?? 'No message',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          _formatDate(data['timestamp'] as Timestamp),
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                          onPressed: () => _deleteNotification(notifications[index].id),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildNotificationsCard() {
-    return Card(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 3,
-      child: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('notifications').snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const ListTile(
-              title: Text('Notifications Sent'),
-              subtitle: Center(child: CircularProgressIndicator()),
-            );
-          }
+  Widget _buildIssuedBooksSection(List<QueryDocumentSnapshot> issuedBooks) {
+    return _buildExpandableSection(
+      'Issued Books',
+      Icons.book_online,
+      issuedBooks,
+          (userId) => IssuedBooksScreen(userId: userId),
+    );
+  }
 
-          if (snapshot.hasError) {
-            return const ListTile(
-              title: Text('Notifications Sent'),
-              subtitle: Center(child: Text('Something went wrong')),
-            );
-          }
+  Widget _buildReturnedBooksSection(List<QueryDocumentSnapshot> returnedBooks) {
+    return _buildExpandableSection(
+      'Returned Books',
+      Icons.assignment_return,
+      returnedBooks,
+          (userId) => AcceptReturnedBooksScreen(userId: userId),
+    );
+  }
 
-          final notifications = snapshot.data?.docs ?? [];
-          final uniqueNotifications = _getUniqueNotifications(notifications);
-
-          return ExpansionTile(
-            title: Text('Notifications (${uniqueNotifications.length})'),
-            children: uniqueNotifications.map((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              final message = data['message'] ?? 'No message';
-              final timestamp = (data['timestamp'] as Timestamp).toDate();
-
-              return ListTile(
-                title: Text(message),
-                subtitle: Text('Sent on ${timestamp.toLocal()}'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () async {
-                    bool success = await _deleteNotification(doc.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(success ? 'Deleted successfully' : 'Failed to delete')),
-                    );
-                  },
+  Widget _buildExpandableSection(
+      String title,
+      IconData icon,
+      List<QueryDocumentSnapshot> docs,
+      Widget Function(String) destinationBuilder,
+      ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+        ),
+        child: ExpansionTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: lightGreen.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: lightGreen, size: 20),
+          ),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          backgroundColor: Colors.transparent,
+          collapsedBackgroundColor: Colors.transparent,
+          title: Row(
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
                 ),
-              );
-            }).toList(),
-          );
-        },
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: lightGreen.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  docs.length.toString(),
+                  style: TextStyle(
+                    color: lightGreen,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          children: [
+            Container(
+              color: Colors.black,
+              constraints: BoxConstraints(
+                maxHeight: docs.length > 3 ? 200 : docs.length * 72.0,
+                minHeight: 0,
+              ),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: docs.length,
+                itemBuilder: (context, index) {
+                  final data = docs[index].data() as Map<String, dynamic>;
+                  final userId = data['userId'] ?? 'Unknown';
+                  return FutureBuilder<DocumentSnapshot>(
+                    future: _firestore.collection('Users').doc(userId).get(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const SizedBox();
+                      final userData = snapshot.data!.data() as Map<String, dynamic>?;
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        title: Text(
+                          userData?['UserName'] ?? 'Unknown User',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          userData?['Email'] ?? 'No email',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 18),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => destinationBuilder(userId)),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildIssuedBooksCard(List<QueryDocumentSnapshot> issuedBooks, BuildContext context) {
-    return Card(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 3,
-      child: ExpansionTile(
-        title: const Text('Books Issued'),
-        children: _buildUniqueUsersList(issuedBooks, context),
-      ),
-    );
+  String _formatDate(Timestamp timestamp) {
+    final date = timestamp.toDate();
+    return '${date.day}/${date.month}/${date.year}';
   }
 
-  Widget _buildReturnedBooksCard(List<QueryDocumentSnapshot> returnedBooks, BuildContext context) {
-    return Card(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 3,
-      child: ExpansionTile(
-        title: const Text('Books Returned'),
-        children: _buildUniqueReturnedUsersList(returnedBooks, context),
-      ),
-    );
-  }
-
-  List<QueryDocumentSnapshot> _getUniqueNotifications(List<QueryDocumentSnapshot> notifications) {
-    final Map<String, QueryDocumentSnapshot> uniqueNotifications = {};
-    for (var doc in notifications) {
-      final data = doc.data() as Map<String, dynamic>;
-      final message = data['message'] ?? '';
-      if (!uniqueNotifications.containsKey(message)) {
-        uniqueNotifications[message] = doc;
+  Future<void> _deleteNotification(String docId) async {
+    try {
+      await _firestore.collection('notifications').doc(docId).delete();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Notification deleted'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
-    return uniqueNotifications.values.toList();
-  }
-
-  Future<bool> _deleteNotification(String notificationId) async {
-    try {
-      await FirebaseFirestore.instance.collection('notifications').doc(notificationId).delete();
-      return true;
-    } catch (e) {
-      print('Error deleting notification: $e');
-      return false;
-    }
-  }
-
-  List<Widget> _buildUniqueUsersList(List<QueryDocumentSnapshot> issuedBooks, BuildContext context) {
-    final Set<String> displayedUsers = {};
-    final List<Widget> userTiles = [];
-
-    for (var doc in issuedBooks) {
-      final data = doc.data() as Map<String, dynamic>;
-      final userId = data['userId'] ?? 'Unknown user';
-
-      if (displayedUsers.contains(userId)) continue;
-
-      displayedUsers.add(userId);
-      userTiles.add(
-        FutureBuilder<DocumentSnapshot>(
-          future: FirebaseFirestore.instance.collection('Users').doc(userId).get(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const ListTile(title: Text('Loading user details...'));
-            }
-            if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
-              return const ListTile(title: Text('User not found'));
-            }
-            final userData = snapshot.data!.data() as Map<String, dynamic>;
-            final username = userData['UserName'] ?? 'Unknown';
-            final email = userData['Email'] ?? 'No email';
-
-            return ListTile(
-              title: Text(username),
-              subtitle: Text(email),
-              trailing: const Icon(Icons.arrow_forward),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => IssuedBooksScreen(userId: userId)),
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    return userTiles;
-  }
-
-  List<Widget> _buildUniqueReturnedUsersList(List<QueryDocumentSnapshot> returnedBooks, BuildContext context) {
-    final Set<String> displayedUsers = {};
-    final List<Widget> userTiles = [];
-
-    for (var doc in returnedBooks) {
-      final data = doc.data() as Map<String, dynamic>;
-      final userId = data['userId'] ?? 'Unknown user';
-
-      if (displayedUsers.contains(userId)) continue;
-
-      displayedUsers.add(userId);
-      userTiles.add(
-        FutureBuilder<DocumentSnapshot>(
-          future: FirebaseFirestore.instance.collection('Users').doc(userId).get(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const ListTile(title: Text('Loading user details...'));
-            }
-            if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
-              return const ListTile(title: Text('User not found'));
-            }
-            final userData = snapshot.data!.data() as Map<String, dynamic>;
-            final username = userData['UserName'] ?? 'Unknown';
-            final email = userData['Email'] ?? 'No email';
-
-            return ListTile(
-              title: Text(username),
-              subtitle: Text(email),
-              trailing: const Icon(Icons.arrow_forward),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => AcceptReturnedBooksScreen(userId: userId)),
-              ),
-            );
-          },
-        ),
-      );
-    }
-
-    return userTiles;
   }
 }

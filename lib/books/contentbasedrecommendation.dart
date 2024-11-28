@@ -270,7 +270,7 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
           )
         else
           SizedBox(
-            height: 300,
+            height: 320,
             child: CarouselSlider.builder(
               itemCount: _popularBooks.length,
               itemBuilder: (context, index, realIndex) {
@@ -283,69 +283,77 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
                   onTap: () => _navigateToDetailPage(book),
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 5),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 8,
-                                  spreadRadius: 1,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: imageUrl.isNotEmpty
-                                  ? Image.network(
-                                      imageUrl,
-                                      width: 150,
-                                      height: 220,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        print('Image Error: $error');
-                                        return _buildPlaceholder();
-                                      },
-                                    )
-                                  : _buildPlaceholder(),
+                    width: 200,
+                    // Add constraints to prevent overflow
+                    constraints: const BoxConstraints(maxHeight: 320),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          height: 220,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: imageUrl.isNotEmpty
+                                ? Image.network(
+                              imageUrl,
+                              width: 150,
+                              height: 220,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                print('Image Error: $error');
+                                return _buildPlaceholder();
+                              },
+                            )
+                                : _buildPlaceholder(),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5),
+                            child: Text(
+                              title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
+                        ),
+                        const SizedBox(height: 4),
+                        Flexible(
+                          child: Text(
                             writer,
                             style: const TextStyle(
                               color: Colors.grey,
-                              fontSize: 14,
+                              fontSize: 12,
                             ),
                             textAlign: TextAlign.center,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 );
               },
               options: CarouselOptions(
-                height: 300,
+                height: 320,
                 viewportFraction: 0.5,
                 enlargeCenterPage: true,
                 enableInfiniteScroll: _popularBooks.length > 1,

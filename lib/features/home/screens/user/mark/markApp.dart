@@ -38,111 +38,259 @@ class BookmarkScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bookmarks & Requests'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Your Bookmarks',
-              style: Theme.of(context).textTheme.headlineLarge,
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: bookCounts.isEmpty
-                  ? const Center(child: Text('No bookmarks yet.'))
-                  : ListView.builder(
-                itemCount: bookCounts.keys.length,
-                itemBuilder: (context, index) {
-                  final title = bookCounts.keys.elementAt(index);
-                  final count = bookCounts[title]!;
-                  final book = filteredBookmarks.firstWhere(
-                        (b) => b['title'] == title,
-                    orElse: () => {
-                      'title': '',
-                      'writer': '',
-                      'imageUrl': '',
-                      'course': '',
-                      'summary': '',
-                      'bookId': '',
-                    },
-                  );
-
-                  return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(8.0),
-                      title: Text('$title (Copies: $count)'),
-                      subtitle: Text(book['writer'] ?? ''),
-                      leading: (book['imageUrl'] ?? '').isNotEmpty
-                          ? ClipRRect(
-                        borderRadius: BorderRadius.circular(4.0),
-                        child: Image.network(
-                          book['imageUrl']!,
-                          width: 50,
-                          height: 50,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(Icons.book);
-                          },
-                        ),
-                      )
-                          : const Icon(Icons.book),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () {
-                          _removeBookmark(context, book);
-                        },
-                      ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => CourseBookDetailScreen(
-                              title: book['title'] ?? '',
-                              writer: book['writer'] ?? '',
-                              imageUrl: book['imageUrl'] ?? '',
-                              course: book['course'] ?? '',
-                              summary: book['summary'] ?? '',
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Requested Books',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const RequestedListScreen(),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                minimumSize: const Size(double.infinity, 50),
-              ),
-              child: const Text('View Requested Books'),
-            ),
-            const SizedBox(height: 80),
-          ],
+        elevation: 0,
+        backgroundColor: Theme.of(context).colorScheme.background,
+        title: const Text(
+          'Bookmark Manager',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Card(
+                elevation: 4,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Column(
+                        children: [
+                          Text(
+                            filteredBookmarks.length.toString(),
+                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const Text(
+                            'Total Books',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          if (bookCounts.isEmpty)
+            SliverToBoxAdapter(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.bookmark_border,
+                      size: 64,
+                      color: Colors.grey[400],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No bookmarks yet',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Text(
+                  'Your Bookmarks',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                    final title = bookCounts.keys.elementAt(index);
+                    final count = bookCounts[title]!;
+                    final book = filteredBookmarks.firstWhere(
+                          (b) => b['title'] == title,
+                      orElse: () => {
+                        'title': '',
+                        'writer': '',
+                        'imageUrl': '',
+                        'course': '',
+                        'summary': '',
+                      },
+                    );
+
+                    return Card(
+                      elevation: 2,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => _navigateToDetail(context, book),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Row(
+                            children: [
+                              _buildBookImage(book),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      title,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      book['writer'] ?? '',
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.copy, size: 16, color: Colors.grey[600]),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '$count copies',
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                color: Colors.red[400],
+                                onPressed: () => _removeBookmark(context, book),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  childCount: bookCounts.keys.length,
+                ),
+              ),
+            ),
+          ],
+
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Requested Books',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const RequestedListScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.list_alt),
+                    label: const Text('View Requested Books'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0C8904),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 80),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _saveBookmarksToRequests(context),
-        child: const Icon(Icons.save),
+        icon: const Icon(Icons.save),
+        label: const Text('Save All'),
+        backgroundColor: const Color(0xFF0C8904),
+      ),
+    );
+  }
+
+  Widget _buildBookImage(Map<String, dynamic> book) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: (book['imageUrl'] ?? '').isNotEmpty
+          ? Image.network(
+        book['imageUrl']!,
+        width: 80,
+        height: 80,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildPlaceholderImage();
+        },
+      )
+          : _buildPlaceholderImage(),
+    );
+  }
+
+  Widget _buildPlaceholderImage() {
+    return Container(
+      width: 80,
+      height: 80,
+      color: Colors.grey[200],
+      child: Icon(
+        Icons.book,
+        size: 40,
+        color: Colors.grey[400],
+      ),
+    );
+  }
+
+  void _navigateToDetail(BuildContext context, Map<String, dynamic> book) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CourseBookDetailScreen(
+          title: book['title'] ?? '',
+          writer: book['writer'] ?? '',
+          imageUrl: book['imageUrl'] ?? '',
+          course: book['course'] ?? '',
+          summary: book['summary'] ?? '',
+        ),
       ),
     );
   }
@@ -150,25 +298,35 @@ class BookmarkScreen extends StatelessWidget {
   Future<void> _removeBookmark(BuildContext context, Map<String, dynamic> book) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User not logged in')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User not logged in')),
+      );
       return;
     }
+
     final docId = book['id'];
     try {
       await FirebaseFirestore.instance.collection('bookmarks').doc(docId).delete();
       Provider.of<BookmarkProvider>(context, listen: false).removeBookmark(book);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${book['title']} removed from bookmarks')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${book['title']} removed from bookmarks')),
+      );
     } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to remove bookmark: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to remove bookmark: $error')),
+      );
     }
   }
 
   Future<void> _saveBookmarksToRequests(BuildContext context) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User not logged in')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User not logged in')),
+      );
       return;
     }
+
     final bookmarks = Provider.of<BookmarkProvider>(context, listen: false).bookmarks;
     final uniqueBookmarks = <Map<String, dynamic>>[];
     final seenTitles = <String>{};
@@ -211,34 +369,43 @@ class BookmarkScreen extends StatelessWidget {
         .where((book) => !existingRequests.contains(book['title'] ?? ''))
         .toList();
 
-    final issuedMessage = issuedBooksTitles.isNotEmpty
-        ? 'The following books are already issued:\n${issuedBooksTitles.join(', ')}\n'
-        : '';
-    final requestsMessage = alreadyRequestedBooks.isNotEmpty
-        ? 'The following books are already in your requests:\n${alreadyRequestedBooks.join(', ')}\n'
-        : '';
-    final addedMessage = newlyAddedBooks.isNotEmpty
-        ? 'The following books have been added to your requests:\n${newlyAddedBooks.map((book) => book['title']).join(', ')}\n'
-        : 'No new books were added to your requests.';
-
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Books Status'),
         content: SingleChildScrollView(
           child: ListBody(
-            children: <Widget>[
-              if (issuedMessage.isNotEmpty) Text(issuedMessage),
-              if (requestsMessage.isNotEmpty) Text(requestsMessage),
-              if (addedMessage.isNotEmpty) Text(addedMessage),
+            children: [
+              if (issuedBooksTitles.isNotEmpty) ...[
+                const Text('Already issued books:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(issuedBooksTitles.join(', ')),
+                const SizedBox(height: 8),
+              ],
+              if (alreadyRequestedBooks.isNotEmpty) ...[
+                const Text('Already requested books:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(alreadyRequestedBooks.join(', ')),
+                const SizedBox(height: 8),
+              ],
+              if (newlyAddedBooks.isNotEmpty) ...[
+                const Text('New books to be requested:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(newlyAddedBooks.map((book) => book['title']).join(', ')),
+              ] else
+                const Text('No new books to request.'),
             ],
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              if (newlyAddedBooks.isNotEmpty) {
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          if (newlyAddedBooks.isNotEmpty)
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
                 try {
                   await FirebaseFirestore.instance.collection('requests').add({
                     'userId': user.uid,
@@ -246,17 +413,16 @@ class BookmarkScreen extends StatelessWidget {
                     'requestedAt': FieldValue.serverTimestamp(),
                   });
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Selected books added to your requests')),
+                    const SnackBar(content: Text('Books added to your requests')),
                   );
                 } catch (error) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Failed to add requests: $error')),
                   );
                 }
-              }
-            },
-            child: const Text('OK'),
-          ),
+              },
+              child: const Text('Confirm'),
+            ),
         ],
       ),
     );

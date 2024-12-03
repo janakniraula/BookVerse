@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:book_Verse/features/home/screens/user/mark/provider.dart';
 import 'package:book_Verse/features/home/screens/user/mark/requestssss.dart';
 import '../../../../../books/detailScreen/course_book_detail_screen.dart';
+import '../../../../../utils/constants/colors.dart';
 
 class MarkApp extends StatelessWidget {
   const MarkApp({super.key});
@@ -24,6 +25,7 @@ class BookmarkScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bookmarks = Provider.of<BookmarkProvider>(context).bookmarks;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final filteredBookmarks = bookmarks.where((book) {
       final title = book['title'];
@@ -39,12 +41,12 @@ class BookmarkScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text(
+        backgroundColor: Theme.of(context).colorScheme.background,
+        title: Text(
           'Bookmark Manager',
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: isDark ? Colors.white : Colors.black,
           ),
         ),
       ),
@@ -64,18 +66,15 @@ class BookmarkScreen extends StatelessWidget {
                         children: [
                           Text(
                             filteredBookmarks.length.toString(),
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black,
-                                ),
+                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
                           ),
-                          const Text(
+                          Text(
                             'Total Books',
                             style: TextStyle(
-                              color: Colors.grey,
+                              color: isDark ? Colors.white70 : Colors.black54,
                             ),
                           ),
                         ],
@@ -86,6 +85,7 @@ class BookmarkScreen extends StatelessWidget {
               ),
             ),
           ),
+
           if (bookCounts.isEmpty)
             SliverToBoxAdapter(
               child: Center(
@@ -95,14 +95,14 @@ class BookmarkScreen extends StatelessWidget {
                     Icon(
                       Icons.bookmark_border,
                       size: 64,
-                      color: Colors.grey[400],
+                      color: isDark ? Colors.grey[400] : Colors.grey[600],
                     ),
                     const SizedBox(height: 16),
                     Text(
                       'No bookmarks yet',
                       style: TextStyle(
                         fontSize: 18,
-                        color: Colors.grey[600],
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
                       ),
                     ),
                   ],
@@ -116,9 +116,9 @@ class BookmarkScreen extends StatelessWidget {
                 child: Text(
                   'Your Bookmarks',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
                 ),
               ),
             ),
@@ -126,11 +126,11 @@ class BookmarkScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) {
+                      (context, index) {
                     final title = bookCounts.keys.elementAt(index);
                     final count = bookCounts[title]!;
                     final book = filteredBookmarks.firstWhere(
-                      (b) => b['title'] == title,
+                          (b) => b['title'] == title,
                       orElse: () => {
                         'title': '',
                         'writer': '',
@@ -167,19 +167,18 @@ class BookmarkScreen extends StatelessWidget {
                                     Text(
                                       book['writer'] ?? '',
                                       style: TextStyle(
-                                        color: Colors.grey[600],
+                                        color: isDark ? Colors.grey[400] : Colors.grey[600],
                                       ),
                                     ),
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
-                                        Icon(Icons.copy,
-                                            size: 16, color: Colors.grey[600]),
+                                        Icon(Icons.copy, size: 16, color: Colors.grey[600]),
                                         const SizedBox(width: 4),
                                         Text(
                                           '$count copies',
                                           style: TextStyle(
-                                            color: Colors.grey[600],
+                                            color: isDark ? Colors.grey[400] : Colors.grey[600],
                                             fontSize: 12,
                                           ),
                                         ),
@@ -204,6 +203,7 @@ class BookmarkScreen extends StatelessWidget {
               ),
             ),
           ],
+
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -213,9 +213,9 @@ class BookmarkScreen extends StatelessWidget {
                   Text(
                     'Requested Books',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
@@ -247,11 +247,8 @@ class BookmarkScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _saveBookmarksToRequests(context),
-        icon: Icon(Icons.save, color: Theme.of(context).colorScheme.onPrimary),
-        label: Text(
-          'Save All',
-          style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
-        ),
+        icon: const Icon(Icons.save),
+        label: const Text('Save All'),
         backgroundColor: const Color(0xFF0C8904),
       ),
     );
@@ -262,14 +259,14 @@ class BookmarkScreen extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: (book['imageUrl'] ?? '').isNotEmpty
           ? Image.network(
-              book['imageUrl']!,
-              width: 80,
-              height: 80,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return _buildPlaceholderImage();
-              },
-            )
+        book['imageUrl']!,
+        width: 80,
+        height: 80,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildPlaceholderImage();
+        },
+      )
           : _buildPlaceholderImage(),
     );
   }
@@ -302,8 +299,7 @@ class BookmarkScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _removeBookmark(
-      BuildContext context, Map<String, dynamic> book) async {
+  Future<void> _removeBookmark(BuildContext context, Map<String, dynamic> book) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -314,12 +310,8 @@ class BookmarkScreen extends StatelessWidget {
 
     final docId = book['id'];
     try {
-      await FirebaseFirestore.instance
-          .collection('bookmarks')
-          .doc(docId)
-          .delete();
-      Provider.of<BookmarkProvider>(context, listen: false)
-          .removeBookmark(book);
+      await FirebaseFirestore.instance.collection('bookmarks').doc(docId).delete();
+      Provider.of<BookmarkProvider>(context, listen: false).removeBookmark(book);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${book['title']} removed from bookmarks')),
       );
@@ -339,8 +331,7 @@ class BookmarkScreen extends StatelessWidget {
       return;
     }
 
-    final bookmarks =
-        Provider.of<BookmarkProvider>(context, listen: false).bookmarks;
+    final bookmarks = Provider.of<BookmarkProvider>(context, listen: false).bookmarks;
     final uniqueBookmarks = <Map<String, dynamic>>[];
     final seenTitles = <String>{};
 
@@ -369,8 +360,8 @@ class BookmarkScreen extends StatelessWidget {
         .where('userId', isEqualTo: user.uid)
         .get();
     final existingRequests = existingRequestsSnapshot.docs
-        .expand((doc) =>
-            (doc.data()['books'] as List).map((book) => book['title'] ?? ''))
+        .expand((doc) => (doc.data()['books'] as List)
+        .map((book) => book['title'] ?? ''))
         .toSet();
 
     final alreadyRequestedBooks = nonIssuedBooks
@@ -426,8 +417,7 @@ class BookmarkScreen extends StatelessWidget {
                     'requestedAt': FieldValue.serverTimestamp(),
                   });
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Books added to your requests')),
+                    const SnackBar(content: Text('Books added to your requests')),
                   );
                 } catch (error) {
                   ScaffoldMessenger.of(context).showSnackBar(

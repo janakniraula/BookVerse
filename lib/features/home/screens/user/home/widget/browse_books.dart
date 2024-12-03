@@ -167,6 +167,7 @@ class _BrowseBooksState extends State<BrowseBooks> {
             imageUrl: book['imageUrl'] ?? '',
             course: book['course'] ?? '',
             summary: book['summary'] ?? '',
+            genre: (book['genre'] as List<dynamic>?) ?? [],
           ),
         ),
       ),

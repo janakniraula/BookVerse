@@ -34,6 +34,7 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
       'imageUrl': data['imageUrl'] ?? '',
       'course': data['course'] ?? '',
       'summary': data['summary'] ?? 'No summary available',
+      'genre': (data['genre'] as List<dynamic>?) ?? [],
     };
   }
 
@@ -53,7 +54,9 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
           .limit(10)
           .get();
 
-      return snapshot.docs.map((doc) => _processBookData(doc.data(), doc.id)).toList();
+      return snapshot.docs
+          .map((doc) => _processBookData(doc.data(), doc.id))
+          .toList();
     } catch (e) {
       print('Error getting fallback books: $e');
       return [];
@@ -61,7 +64,8 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
   }
 
   // Calculate similarity between user profile and book
-  double _calculateSimilarity(Map<String, double> profile, Map<String, dynamic> book) {
+  double _calculateSimilarity(
+      Map<String, double> profile, Map<String, dynamic> book) {
     double similarity = 0.0;
     double profileNorm = 0.0;
     double bookNorm = 0.0;
@@ -75,7 +79,8 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
     bookNorm += writerValue * writerValue;
 
     // Calculate genre similarity
-    final genres = (book['genre'] as List<dynamic>? ?? []).map((g) => g.toString().toLowerCase());
+    final genres = (book['genre'] as List<dynamic>? ?? [])
+        .map((g) => g.toString().toLowerCase());
     for (var genre in genres) {
       final genreKey = 'genre_$genre';
       final genreValue = 2.5;
@@ -96,28 +101,34 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
 
     // Avoid division by zero
     if (profileNorm == 0 || bookNorm == 0) return 0.0;
-    
+
     return similarity / (sqrt(profileNorm) * sqrt(bookNorm));
   }
 
   // Add book features to profile with weight
-  void _addToProfile(Map<String, double> profile, Map<String, dynamic> bookData, double weight) {
+  void _addToProfile(Map<String, double> profile, Map<String, dynamic> bookData,
+      double weight) {
     final writer = bookData['writer']?.toString().toLowerCase() ?? '';
-    final genres = (bookData['genre'] as List<dynamic>? ?? []).map((g) => g.toString().toLowerCase());
+    final genres = (bookData['genre'] as List<dynamic>? ?? [])
+        .map((g) => g.toString().toLowerCase());
     final course = bookData['course']?.toString().toLowerCase() ?? '';
 
     // Add weighted features
-    if (writer.isNotEmpty) profile['writer_$writer'] = (profile['writer_$writer'] ?? 0.0) + 4.0 * weight;
+    if (writer.isNotEmpty)
+      profile['writer_$writer'] =
+          (profile['writer_$writer'] ?? 0.0) + 4.0 * weight;
     for (var genre in genres) {
       profile['genre_$genre'] = (profile['genre_$genre'] ?? 0.0) + 2.5 * weight;
     }
     if (course.isNotEmpty) {
-      profile['course_$course'] = (profile['course_$course'] ?? 0.0) + 2.0 * weight;
+      profile['course_$course'] =
+          (profile['course_$course'] ?? 0.0) + 2.0 * weight;
     }
   }
 
   // Get recommended books based on user profile
-  Future<List<Map<String, dynamic>>> _getRecommendedBooks(Map<String, double> userProfile) async {
+  Future<List<Map<String, dynamic>>> _getRecommendedBooks(
+      Map<String, double> userProfile) async {
     final allBooks = await _firestore.collection('books').limit(200).get();
     final scoredBooks = <MapEntry<double, Map<String, dynamic>>>[];
     final selectedAuthors = <String>{};
@@ -125,11 +136,11 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
     for (var doc in allBooks.docs) {
       final bookData = doc.data();
       final similarity = _calculateSimilarity(userProfile, bookData);
-      
+
       if (similarity > 0.1) {
         final author = bookData['writer']?.toString().toLowerCase() ?? '';
         final diversityFactor = selectedAuthors.contains(author) ? 0.7 : 1.0;
-        
+
         scoredBooks.add(MapEntry(
           similarity * diversityFactor,
           _processBookData(bookData, doc.id),
@@ -167,7 +178,7 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
       final searchedAt = (bookData['searchedAt'] as Timestamp).toDate();
       final daysDifference = now.difference(searchedAt).inDays;
       final timeDecay = exp(-0.1 * daysDifference);
-      
+
       _addToProfile(profile, bookData, timeDecay);
     }
 
@@ -177,7 +188,8 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
       if (bookId != null) {
         final bookDoc = await _firestore.collection('books').doc(bookId).get();
         if (bookDoc.exists) {
-          _addToProfile(profile, bookDoc.data()!, 1.5); // Bookmarks get 1.5x weight
+          _addToProfile(
+              profile, bookDoc.data()!, 1.5); // Bookmarks get 1.5x weight
         }
       }
     }
@@ -198,10 +210,10 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
 
       // Get user profile data
       final userProfile = await _createUserProfile(userId);
-      
+
       // Get recommendations based on profile
       final recommendations = await _getRecommendedBooks(userProfile);
-      
+
       _updateState(recommendations, false);
     } catch (e) {
       print('Error in recommendations: $e');
@@ -364,6 +376,7 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
           imageUrl: book['imageUrl'],
           course: book['course'],
           summary: book['summary'],
+          genre: (book['genre'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
         ),
       ),
     );

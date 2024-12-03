@@ -134,6 +134,10 @@ class GenreBookDetailScreen extends StatelessWidget {
         ? Image.network(
             imageUrl!,
             fit: BoxFit.cover,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Center(child: CircularProgressIndicator());
+            },
             errorBuilder: (_, __, ___) => _buildPlaceholder(),
           )
         : _buildPlaceholder();
@@ -215,6 +219,7 @@ class GenreBookDetailScreen extends StatelessWidget {
           imageUrl: book['imageUrl'] ?? '',
           course: book['course'] ?? '',
           summary: book['summary'] ?? '',
+          genre: (book['genre'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
         ),
       ),
     );
@@ -233,10 +238,12 @@ class GenreBookDetailScreen extends StatelessWidget {
           'imageUrl': data['imageUrl'] ?? '',
           'course': data['course'] ?? '',
           'summary': data['summary'] ?? '',
+          'genre': data['genre'] ?? [],
           'totalCopies': 0,
         };
       }
-      groupedBooks[title]!['totalCopies'] += data['numberOfCopies'] ?? 0;
+      final copies = data['numberOfCopies'];
+      groupedBooks[title]!['totalCopies'] += (copies is int) ? copies : 0;
     }
     return groupedBooks;
   }

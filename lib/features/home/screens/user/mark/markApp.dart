@@ -39,12 +39,12 @@ class BookmarkScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Theme.of(context).colorScheme.background,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text(
           'Bookmark Manager',
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: Colors.black,
           ),
         ),
       ),
@@ -66,12 +66,14 @@ class BookmarkScreen extends StatelessWidget {
                             filteredBookmarks.length.toString(),
                             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: Colors.black,
                             ),
                           ),
                           const Text(
                             'Total Books',
-                            style: TextStyle(color: Colors.white),
+                            style: TextStyle(
+                              color: Colors.grey,
+                            ),
                           ),
                         ],
                       ),
@@ -243,8 +245,11 @@ class BookmarkScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _saveBookmarksToRequests(context),
-        icon: const Icon(Icons.save),
-        label: const Text('Save All'),
+        icon: Icon(Icons.save, color: Theme.of(context).colorScheme.onPrimary),
+        label: Text(
+          'Save All',
+          style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
+        ),
         backgroundColor: const Color(0xFF0C8904),
       ),
     );

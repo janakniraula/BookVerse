@@ -4,7 +4,6 @@ import '../../../../../books/contentbasedrecommendation.dart';
 import '../../../../../books/detailScreen/genre_book_detail_screen.dart';
 import '../../../../../books/CourseSection/courseSelection.dart';
 import '../../../../../common/widgets/custom_shapes/primary_header_container.dart';
-import '../../../../../common/widgets/texts/section_heading.dart';
 import '../../../../../utils/constants/sizes.dart';
 import 'widget/home_appbar.dart';
 
@@ -77,277 +76,53 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildGradeCard(String grade) {
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CourseSelectionScreen(grade: grade),
-        ),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Colors.purpleAccent, Colors.deepPurpleAccent],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CourseSelectionScreen(grade: grade),
           ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.4),
-              spreadRadius: 2,
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.school,
-                size: 40,
-                color: Colors.white,
-              ),
+        borderRadius: BorderRadius.circular(15),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+            gradient: LinearGradient(
+              colors: [Colors.blue[700]!, Colors.blue[900]!],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            const SizedBox(height: 12),
-            Text(
-              grade,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: 1.1,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${_courseBooks[grade]?.length ?? 0} Books',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.white.withOpacity(0.8),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGenreCard(String genre) {
-    final genreIcons = {
-      'FICTION': Icons.auto_stories,
-      'ADVENTURE': Icons.hiking,
-      'SCI-FI': Icons.rocket,
-      'MYSTERY': Icons.search,
-      'LITERATURE': Icons.library_books,
-      'EMOTIONAL': Icons.favorite,
-      'FANTASY': Icons.auto_fix_high,
-      'DARK': Icons.dark_mode,
-      'ROMANCE': Icons.favorite_border,
-      'DRAMA': Icons.theater_comedy,
-    };
-
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => GenreBookDetailScreen(genre: genre),
-        ),
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Colors.green.shade600,
-              Colors.green.shade400,
-            ],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
           ),
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              spreadRadius: 1,
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              genreIcons[genre.toUpperCase()] ?? Icons.book,
-              size: 20,
-              color: Colors.white,
-            ),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    genre,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  Text(
-                    '${_genreBooks[genre]?.length ?? 0}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.white.withOpacity(0.9),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionGrid({
-    required Map<String, List<QueryDocumentSnapshot>> items,
-    required Widget Function(String) cardBuilder,
-    required double childAspectRatio,
-  }) {
-    final itemKeys = items.keys.toList();
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: childAspectRatio,
-      ),
-      itemCount: itemKeys.length,
-      itemBuilder: (context, index) => cardBuilder(itemKeys[index]),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, size: 48, color: Colors.red),
-          const SizedBox(height: 16),
-          Text(
-            'Error: $_error',
-            style: const TextStyle(color: Colors.red),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _loadData,
-            child: const Text('Retry'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLoadingState() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
-          Text('Loading content...'),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onTap: () {
-        FocusScope.of(context).unfocus();
-        FocusManager.instance.primaryFocus?.unfocus();
-      },
-      child: Scaffold(
-        body: RefreshIndicator(
-          onRefresh: _loadData,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const TPrimaryHeaderContainer(
-                  child: Column(
-                    children: [
-                      SizedBox(height: TSizes.sm),
-                      THomeAppBar(),
-                      SizedBox(height: TSizes.spaceBtwSections),
-                    ],
+                Icon(
+                  Icons.school_outlined,
+                  size: 32,
+                  color: Colors.white.withOpacity(0.9),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Grade $grade',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
-                if (_isLoading)
-                  _buildLoadingState()
-                else if (_error != null)
-                  _buildErrorState()
-                else
-                  Padding(
-                    padding: const EdgeInsets.all(TSizes.defaultSpace),
-                    child: Column(
-                      children: [
-                        // Recommendations Section
-                        const ContentBasedAlgorithm(),
-                        const SizedBox(height: TSizes.spaceBtwSections),
-                        const Divider(),
-                        const SizedBox(height: TSizes.spaceBtwItems),
-
-                        // Course Books Section
-                        TSectionHeading(
-                          title: '| Course Books',
-                          fontSize: 25,
-                          onPressed: () {},
-                        ),
-                        const SizedBox(height: TSizes.spaceBtwItems),
-                        _buildSectionGrid(
-                          items: _courseBooks,
-                          cardBuilder: _buildGradeCard,
-                          childAspectRatio: 4 / 3,
-                        ),
-                        const SizedBox(height: TSizes.spaceBtwSections),
-                        const Divider(),
-                        const SizedBox(height: TSizes.spaceBtwItems),
-
-                        // Genre Section
-                        TSectionHeading(
-                          title: '| Genre',
-                          fontSize: 25,
-                          onPressed: () {},
-                        ),
-                        const SizedBox(height: TSizes.spaceBtwItems),
-                        _buildSectionGrid(
-                          items: _genreBooks,
-                          cardBuilder: _buildGenreCard,
-                          childAspectRatio: 2.5,
-                        ),
-                        const SizedBox(height: TSizes.spaceBtwSections),
-                      ],
-                    ),
+                const SizedBox(height: 4),
+                Text(
+                  '${_courseBooks[grade]?.length ?? 0} Books',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 14,
                   ),
+                ),
               ],
             ),
           ),
@@ -356,8 +131,181 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildGenreCard(String genre) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => GenreBookDetailScreen(genre: genre),
+          ),
+        ),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 140, // Fixed width for consistent sizing
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            gradient: LinearGradient(
+              colors: [
+                Colors.indigo.withOpacity(0.8),
+                Colors.indigo,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                genre,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${_genreBooks[genre]?.length ?? 0} Books',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSection({
+    required String title,
+    required Widget content,
+    VoidCallback? onViewAll,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (onViewAll != null)
+                TextButton(
+                  onPressed: onViewAll,
+                  child: const Text('View All'),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        content,
+      ],
+    );
+  }
+
   @override
-  void dispose() {
-    super.dispose();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: _loadData,
+        child: CustomScrollView(
+          slivers: [
+            const SliverToBoxAdapter(
+              child: TPrimaryHeaderContainer(
+                child: Column(
+                  children: [
+                    SizedBox(height: TSizes.sm),
+                    THomeAppBar(),
+                    SizedBox(height: TSizes.spaceBtwSections),
+                  ],
+                ),
+              ),
+            ),
+            if (_isLoading)
+              const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null)
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text('Error: $_error'),
+                      ElevatedButton(
+                        onPressed: _loadData,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              SliverList(
+                delegate: SliverChildListDelegate([
+                  const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: ContentBasedAlgorithm(),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSection(
+                    title: 'Course Books',
+                    content: GridView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 1,
+                      ),
+                      itemCount: _courseBooks.length,
+                      itemBuilder: (context, index) =>
+                          _buildGradeCard(_courseBooks.keys.elementAt(index)),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSection(
+                    title: 'Genres',
+                    content: SizedBox(
+                      height: 70, // Fixed height for the horizontal list
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _genreBooks.length,
+                        itemBuilder: (context, index) => Padding(
+                          padding: const EdgeInsets.only(right: 12),
+                          child: _buildGenreCard(_genreBooks.keys.elementAt(index)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ]),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }

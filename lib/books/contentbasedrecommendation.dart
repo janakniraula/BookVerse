@@ -215,7 +215,7 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TSectionHeading(
-          title: '| Popular Books',
+          title: 'Popular Books',
           fontSize: 25,
           onPressed: _fetchRecommendations,
         ),

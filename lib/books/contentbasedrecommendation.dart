@@ -16,269 +16,16 @@ class ContentBasedAlgorithm extends StatefulWidget {
 
 class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  List<Map<String, dynamic>> _popularBooks = [];
+  List<Map<String, dynamic>> _recommendedBooks = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchCombinedRecommendations();
+    _fetchRecommendations();
   }
 
-  Future<void> _fetchCombinedRecommendations() async {
-    try {
-      setState(() => _isLoading = true);
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-
-      if (userId == null) {
-        print('No user logged in.');
-        _updateState([], false);
-        return;
-      }
-
-      // Get recommendations from both systems
-      final authorBasedBooks = await _fetchAuthorBasedRecommendations(userId);
-      final recentBooks = await _getRecommendedBooks(userId);
-
-      // Combine both lists and remove duplicates
-      final Set<Map<String, dynamic>> combinedBooks = {};
-      combinedBooks.addAll(authorBasedBooks);
-      combinedBooks.addAll(recentBooks);
-
-      if (combinedBooks.isEmpty) {
-        final fallbackBooks = await _getFallbackBooks();
-        _updateState(fallbackBooks, false);
-        return;
-      }
-
-      _updateState(combinedBooks.toList(), false);
-    } catch (e) {
-      print('Error in recommendation system: $e');
-      try {
-        final fallbackBooks = await _getFallbackBooks();
-        _updateState(fallbackBooks, false);
-      } catch (fallbackError) {
-        print('Error getting fallback books: $fallbackError');
-        _updateState([], false);
-      }
-    }
-  }
-
-  // Original author-based recommendation system
-  Future<List<Map<String, dynamic>>> _fetchAuthorBasedRecommendations(
-      String userId) async {
-    try {
-      final searchedBooksSnapshot = await _firestore
-          .collection('searchedBooks')
-          .where('userId', isEqualTo: userId)
-          .orderBy('searchedAt', descending: true)
-          .limit(7)
-          .get();
-
-      if (searchedBooksSnapshot.docs.isEmpty) {
-        return [];
-      }
-
-      final searchedBook = searchedBooksSnapshot.docs.first.data();
-      final searchedAuthor = searchedBook['writer']?.trim();
-
-      if (searchedAuthor == null || searchedAuthor.isEmpty) {
-        return [];
-      }
-
-      final bookmarksByAuthorSnapshot = await _firestore
-          .collection('bookmarks')
-          .where('writer', isEqualTo: searchedAuthor)
-          .get();
-
-      final bookmarkedBookIds = bookmarksByAuthorSnapshot.docs
-          .map((doc) => doc.data()['bookId'] as String?)
-          .where((bookId) => bookId != null)
-          .toSet();
-
-      if (bookmarkedBookIds.isEmpty) {
-        return [];
-      }
-
-      final recommendedBooks = await Future.wait(
-        bookmarkedBookIds.map((bookId) async {
-          final bookDoc =
-              await _firestore.collection('books').doc(bookId).get();
-          return bookDoc.exists ? bookDoc.data() as Map<String, dynamic> : null;
-        }),
-      );
-
-      return recommendedBooks.whereType<Map<String, dynamic>>().toList();
-    } catch (e) {
-      print('Error in author-based recommendations: $e');
-      return [];
-    }
-  }
-
-  // Add new helper methods for cosine similarity
-  double _calculateCosineSimilarity(Map<String, double> vector1, Map<String, double> vector2) {
-    double dotProduct = 0.0;
-    double norm1 = 0.0;
-    double norm2 = 0.0;
-    
-    // Calculate dot product and norms
-    Set<String> allKeys = {...vector1.keys, ...vector2.keys};
-    for (String key in allKeys) {
-      double val1 = vector1[key] ?? 0.0;
-      double val2 = vector2[key] ?? 0.0;
-      dotProduct += val1 * val2;
-      norm1 += val1 * val1;
-      norm2 += val2 * val2;
-    }
-    
-    // Avoid division by zero
-    if (norm1 == 0 || norm2 == 0) return 0.0;
-    
-    return dotProduct / (sqrt(norm1) * sqrt(norm2));
-  }
-
-  Map<String, double> _createBookVector(Map<String, dynamic> book) {
-    Map<String, double> vector = {};
-    
-    // Extract features
-    String writer = (book['writer'] ?? '').toString().toLowerCase();
-    List<String> genres = (book['genre'] as List<dynamic>? ?? [])
-        .map((g) => g.toString().toLowerCase())
-        .toList();
-    String course = (book['course'] ?? '').toString().toLowerCase();
-    String title = (book['title'] ?? '').toString().toLowerCase();
-    
-    // Writer feature (high weight as it's very important)
-    vector['writer_$writer'] = 4.0;
-    
-    // Genre features (medium-high weight as they're important for recommendations)
-    for (String genre in genres) {
-      vector['genre_$genre'] = 2.5;
-    }
-    
-    // Course feature (medium weight)
-    if (course.isNotEmpty) {
-      vector['course_$course'] = 2.0;
-    }
-    
-    // Title keywords (lower weight but still relevant)
-    List<String> titleWords = title.split(' ')
-      .where((word) => word.length > 3) // Only consider meaningful words
-      .toList();
-    for (String word in titleWords) {
-      vector['title_$word'] = 1.0;
-    }
-    
-    return vector;
-  }
-
-  // Update the recommendation system
-  Future<List<Map<String, dynamic>>> _getRecommendedBooks(String userId) async {
-    try {
-      // Get user's recent searches with timestamps
-      final searchedBooksSnapshot = await _firestore
-          .collection('searchedBooks')
-          .where('userId', isEqualTo: userId)
-          .orderBy('searchedAt', descending: true)
-          .limit(10) // Increased limit for better profile
-          .get();
-
-      if (searchedBooksSnapshot.docs.isEmpty) {
-        print('No search history found');
-        return [];
-      }
-
-      // Get all books for comparison
-      final allBooksSnapshot = await _firestore
-          .collection('books')
-          .limit(200) // Increased limit for better recommendations
-          .get();
-
-      // Create user profile vector with time decay
-      Map<String, double> userProfile = {};
-      final searchedBooks = searchedBooksSnapshot.docs;
-      final now = DateTime.now();
-      
-      for (var doc in searchedBooks) {
-        final bookVector = _createBookVector(doc.data());
-        final searchedAt = (doc.data()['searchedAt'] as Timestamp).toDate();
-        
-        // Calculate time-based decay factor (exponential decay over days)
-        final daysDifference = now.difference(searchedAt).inDays;
-        final timeDecay = exp(-0.1 * daysDifference); // Adjust decay rate as needed
-        
-        // Combine vectors with time decay
-        bookVector.forEach((key, value) {
-          userProfile[key] = (userProfile[key] ?? 0.0) + value * timeDecay;
-        });
-      }
-
-      // Calculate similarity scores and ensure diversity
-      List<MapEntry<double, Map<String, dynamic>>> scoredBooks = [];
-      Set<String> selectedAuthors = {}; // Track selected authors for diversity
-      
-      for (var doc in allBooksSnapshot.docs) {
-        final bookData = doc.data();
-        final bookVector = _createBookVector(bookData);
-        final similarity = _calculateCosineSimilarity(userProfile, bookVector);
-        
-        if (similarity > 0.1) { // Minimum similarity threshold
-          final author = bookData['writer']?.toString().toLowerCase() ?? '';
-          
-          // Apply diversity penalty if author already selected
-          double diversityFactor = selectedAuthors.contains(author) ? 0.7 : 1.0;
-          
-          scoredBooks.add(MapEntry(
-            similarity * diversityFactor,
-            _processBookData(bookData, doc.id),
-          ));
-        }
-      }
-
-      // Sort by final score and take top results
-      scoredBooks.sort((a, b) => b.key.compareTo(a.key));
-      final recommendations = scoredBooks.take(10).map((e) => e.value).toList();
-      
-      // Update selected authors for future diversity checks
-      for (var book in recommendations) {
-        selectedAuthors.add(book['writer']?.toString().toLowerCase() ?? '');
-      }
-
-      return recommendations;
-    } catch (e) {
-      print('Error getting recommendations: $e');
-      return [];
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> _getFallbackBooks() async {
-    try {
-      // Get recent books as fallback
-      final fallbackBooksSnapshot = await _firestore
-          .collection('books')
-          .orderBy('createdAt', descending: true)
-          .limit(10)
-          .get();
-
-      if (fallbackBooksSnapshot.docs.isEmpty) {
-        // If no books with createdAt, just get any books
-        final anyBooksSnapshot =
-            await _firestore.collection('books').limit(10).get();
-
-        return anyBooksSnapshot.docs
-            .map((doc) => _processBookData(doc.data(), doc.id))
-            .toList();
-      }
-
-      return fallbackBooksSnapshot.docs
-          .map((doc) => _processBookData(doc.data(), doc.id))
-          .toList();
-    } catch (e) {
-      print('Error getting fallback books: $e');
-      return [];
-    }
-  }
-
+  // Process book data for display
   Map<String, dynamic> _processBookData(Map<String, dynamic> data, String id) {
     return {
       'id': id,
@@ -292,42 +39,174 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
 
   void _updateState(List<Map<String, dynamic>> books, bool loading) {
     setState(() {
-      _popularBooks = books;
+      _recommendedBooks = books;
       _isLoading = loading;
     });
   }
 
-  void _navigateToDetailPage(Map<String, dynamic> book) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CourseBookDetailScreen(
-          title: book['title'],
-          writer: book['writer'],
-          imageUrl: book['imageUrl'],
-          course: book['course'],
-          summary: book['summary'],
-        ),
-      ),
-    );
+  // Get fallback recommendations
+  Future<List<Map<String, dynamic>>> _getFallbackBooks() async {
+    try {
+      final snapshot = await _firestore
+          .collection('books')
+          .orderBy('createdAt', descending: true)
+          .limit(10)
+          .get();
+
+      return snapshot.docs.map((doc) => _processBookData(doc.data(), doc.id)).toList();
+    } catch (e) {
+      print('Error getting fallback books: $e');
+      return [];
+    }
   }
 
-  Widget _buildPlaceholder() {
-    return Container(
-      width: 150,
-      height: 220,
-      decoration: BoxDecoration(
-        color: Colors.grey[300],
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: const Center(
-        child: Icon(
-          Icons.book,
-          size: 50,
-          color: Colors.grey,
-        ),
-      ),
-    );
+  // Calculate similarity between user profile and book
+  double _calculateSimilarity(Map<String, double> profile, Map<String, dynamic> book) {
+    double similarity = 0.0;
+    double profileNorm = 0.0;
+    double bookNorm = 0.0;
+
+    // Calculate writer similarity
+    final writer = book['writer']?.toString().toLowerCase() ?? '';
+    final writerKey = 'writer_$writer';
+    final writerValue = 4.0;
+    similarity += (profile[writerKey] ?? 0.0) * writerValue;
+    profileNorm += (profile[writerKey] ?? 0.0) * (profile[writerKey] ?? 0.0);
+    bookNorm += writerValue * writerValue;
+
+    // Calculate genre similarity
+    final genres = (book['genre'] as List<dynamic>? ?? []).map((g) => g.toString().toLowerCase());
+    for (var genre in genres) {
+      final genreKey = 'genre_$genre';
+      final genreValue = 2.5;
+      similarity += (profile[genreKey] ?? 0.0) * genreValue;
+      profileNorm += (profile[genreKey] ?? 0.0) * (profile[genreKey] ?? 0.0);
+      bookNorm += genreValue * genreValue;
+    }
+
+    // Calculate course similarity
+    final course = book['course']?.toString().toLowerCase() ?? '';
+    if (course.isNotEmpty) {
+      final courseKey = 'course_$course';
+      final courseValue = 2.0;
+      similarity += (profile[courseKey] ?? 0.0) * courseValue;
+      profileNorm += (profile[courseKey] ?? 0.0) * (profile[courseKey] ?? 0.0);
+      bookNorm += courseValue * courseValue;
+    }
+
+    // Avoid division by zero
+    if (profileNorm == 0 || bookNorm == 0) return 0.0;
+    
+    return similarity / (sqrt(profileNorm) * sqrt(bookNorm));
+  }
+
+  // Add book features to profile with weight
+  void _addToProfile(Map<String, double> profile, Map<String, dynamic> bookData, double weight) {
+    final writer = bookData['writer']?.toString().toLowerCase() ?? '';
+    final genres = (bookData['genre'] as List<dynamic>? ?? []).map((g) => g.toString().toLowerCase());
+    final course = bookData['course']?.toString().toLowerCase() ?? '';
+
+    // Add weighted features
+    if (writer.isNotEmpty) profile['writer_$writer'] = (profile['writer_$writer'] ?? 0.0) + 4.0 * weight;
+    for (var genre in genres) {
+      profile['genre_$genre'] = (profile['genre_$genre'] ?? 0.0) + 2.5 * weight;
+    }
+    if (course.isNotEmpty) {
+      profile['course_$course'] = (profile['course_$course'] ?? 0.0) + 2.0 * weight;
+    }
+  }
+
+  // Get recommended books based on user profile
+  Future<List<Map<String, dynamic>>> _getRecommendedBooks(Map<String, double> userProfile) async {
+    final allBooks = await _firestore.collection('books').limit(200).get();
+    final scoredBooks = <MapEntry<double, Map<String, dynamic>>>[];
+    final selectedAuthors = <String>{};
+
+    for (var doc in allBooks.docs) {
+      final bookData = doc.data();
+      final similarity = _calculateSimilarity(userProfile, bookData);
+      
+      if (similarity > 0.1) {
+        final author = bookData['writer']?.toString().toLowerCase() ?? '';
+        final diversityFactor = selectedAuthors.contains(author) ? 0.7 : 1.0;
+        
+        scoredBooks.add(MapEntry(
+          similarity * diversityFactor,
+          _processBookData(bookData, doc.id),
+        ));
+        selectedAuthors.add(author);
+      }
+    }
+
+    scoredBooks.sort((a, b) => b.key.compareTo(a.key));
+    return scoredBooks.take(10).map((e) => e.value).toList();
+  }
+
+  // Create user profile from search history and bookmarks
+  Future<Map<String, double>> _createUserProfile(String userId) async {
+    Map<String, double> profile = {};
+    final now = DateTime.now();
+
+    // Get search history
+    final searches = await _firestore
+        .collection('searchedBooks')
+        .where('userId', isEqualTo: userId)
+        .orderBy('searchedAt', descending: true)
+        .limit(10)
+        .get();
+
+    // Get bookmarks
+    final bookmarks = await _firestore
+        .collection('bookmarks')
+        .where('userId', isEqualTo: userId)
+        .get();
+
+    // Process search history with time decay
+    for (var doc in searches.docs) {
+      final bookData = doc.data();
+      final searchedAt = (bookData['searchedAt'] as Timestamp).toDate();
+      final daysDifference = now.difference(searchedAt).inDays;
+      final timeDecay = exp(-0.1 * daysDifference);
+      
+      _addToProfile(profile, bookData, timeDecay);
+    }
+
+    // Process bookmarks with higher weight
+    for (var doc in bookmarks.docs) {
+      final bookId = doc.data()['bookId'] as String?;
+      if (bookId != null) {
+        final bookDoc = await _firestore.collection('books').doc(bookId).get();
+        if (bookDoc.exists) {
+          _addToProfile(profile, bookDoc.data()!, 1.5); // Bookmarks get 1.5x weight
+        }
+      }
+    }
+
+    return profile;
+  }
+
+  // Main recommendation function
+  Future<void> _fetchRecommendations() async {
+    try {
+      setState(() => _isLoading = true);
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+
+      if (userId == null) {
+        print('No user logged in');
+        return _updateState(await _getFallbackBooks(), false);
+      }
+
+      // Get user profile data
+      final userProfile = await _createUserProfile(userId);
+      
+      // Get recommendations based on profile
+      final recommendations = await _getRecommendedBooks(userProfile);
+      
+      _updateState(recommendations, false);
+    } catch (e) {
+      print('Error in recommendations: $e');
+      _updateState(await _getFallbackBooks(), false);
+    }
   }
 
   @override
@@ -338,7 +217,7 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
         TSectionHeading(
           title: '| Popular Books',
           fontSize: 25,
-          onPressed: _fetchCombinedRecommendations,
+          onPressed: _fetchRecommendations,
         ),
         const SizedBox(height: 10),
         if (_isLoading)
@@ -348,7 +227,7 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
               child: CircularProgressIndicator(),
             ),
           )
-        else if (_popularBooks.isEmpty)
+        else if (_recommendedBooks.isEmpty)
           const Center(
             child: Padding(
               padding: EdgeInsets.all(20.0),
@@ -362,9 +241,9 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
           SizedBox(
             height: 320,
             child: CarouselSlider.builder(
-              itemCount: _popularBooks.length,
+              itemCount: _recommendedBooks.length,
               itemBuilder: (context, index, realIndex) {
-                final book = _popularBooks[index];
+                final book = _recommendedBooks[index];
                 final imageUrl = book['imageUrl'];
                 final title = book['title'];
                 final writer = book['writer'];
@@ -374,7 +253,6 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 5),
                     width: 200,
-                    // Add constraints to prevent overflow
                     constraints: const BoxConstraints(maxHeight: 320),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -446,8 +324,8 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
                 height: 320,
                 viewportFraction: 0.5,
                 enlargeCenterPage: true,
-                enableInfiniteScroll: _popularBooks.length > 1,
-                autoPlay: _popularBooks.length > 1,
+                enableInfiniteScroll: _recommendedBooks.length > 1,
+                autoPlay: _recommendedBooks.length > 1,
                 autoPlayInterval: const Duration(seconds: 3),
                 autoPlayAnimationDuration: const Duration(milliseconds: 800),
                 autoPlayCurve: Curves.fastOutSlowIn,
@@ -455,6 +333,39 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      width: 150,
+      height: 220,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.book,
+          size: 50,
+          color: Colors.grey,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToDetailPage(Map<String, dynamic> book) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CourseBookDetailScreen(
+          title: book['title'],
+          writer: book['writer'],
+          imageUrl: book['imageUrl'],
+          course: book['course'],
+          summary: book['summary'],
+        ),
+      ),
     );
   }
 }

@@ -10,16 +10,21 @@ class BookListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
       appBar: AppBar(
         title: Text(isCourseBook ? 'Course Books' : 'Books'),
+        backgroundColor: isDark ? Colors.black : Colors.white,
       ),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.black, Colors.black87, Colors.black54],
+            colors: isDark 
+                ? [Colors.black, Colors.black87, Colors.black54]
+                : [Colors.white, Colors.white, Colors.grey[100]!],
           ),
         ),
         child: StreamBuilder<QuerySnapshot>(
@@ -37,13 +42,13 @@ class BookListScreen extends StatelessWidget {
             }
 
             final groupedBooks = _groupBooks(snapshot.data!.docs);
-
             return ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: groupedBooks.length,
               itemBuilder: (context, index) => _buildBookCard(
                 context, 
-                groupedBooks.values.elementAt(index)
+                groupedBooks.values.elementAt(index),
+                isDark,
               ),
             );
           },
@@ -76,11 +81,11 @@ class BookListScreen extends StatelessWidget {
     return groupedBooks;
   }
 
-  Widget _buildBookCard(BuildContext context, Map<String, dynamic> book) {
+  Widget _buildBookCard(BuildContext context, Map<String, dynamic> book, bool isDark) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 4,
-      color: Colors.grey[900],
+      color: isDark ? Colors.grey[900] : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () => Navigator.push(
@@ -101,7 +106,7 @@ class BookListScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildBookImage(book),
-              _buildBookDetails(book),
+              _buildBookDetails(book, isDark),
             ],
           ),
         ),
@@ -136,7 +141,7 @@ class BookListScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBookDetails(Map<String, dynamic> book) {
+  Widget _buildBookDetails(Map<String, dynamic> book, bool isDark) {
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -146,10 +151,10 @@ class BookListScreen extends StatelessWidget {
           children: [
             Text(
               book['title'],
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
-                color: Colors.white,
+                color: isDark ? Colors.white : Colors.black,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -158,7 +163,7 @@ class BookListScreen extends StatelessWidget {
             Text(
               book['writer'],
               style: TextStyle(
-                color: Colors.grey[400],
+                color: isDark ? Colors.grey[400] : Colors.grey[700],
                 fontSize: 16,
               ),
               maxLines: 1,
@@ -167,12 +172,16 @@ class BookListScreen extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                Icon(Icons.book_outlined, size: 16, color: Colors.grey[500]),
+                Icon(
+                  Icons.book_outlined, 
+                  size: 16, 
+                  color: isDark ? Colors.grey[500] : Colors.grey[700]
+                ),
                 const SizedBox(width: 4),
                 Text(
                   'Available: ${book['totalCopies']}',
                   style: TextStyle(
-                    color: Colors.grey[500],
+                    color: isDark ? Colors.grey[500] : Colors.grey[700],
                     fontSize: 14,
                   ),
                 ),
@@ -182,18 +191,20 @@ class BookListScreen extends StatelessWidget {
                 book['genre']?.isNotEmpty == true) ...[
               const SizedBox(height: 8),
               Container(
-                padding: EdgeInsets.symmetric(
+                padding: const EdgeInsets.symmetric(
                   horizontal: 8, 
                   vertical: 4
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.2),
+                  color: isDark 
+                      ? Colors.blue.withOpacity(0.2)
+                      : Colors.blue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   book['course'] ?? book['genre'] ?? '',
-                  style: const TextStyle(
-                    color: Colors.blue,
+                  style: TextStyle(
+                    color: isDark ? Colors.blue[300] : Colors.blue[700],
                     fontSize: 12,
                   ),
                 ),

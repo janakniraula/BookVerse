@@ -8,17 +8,19 @@ class GenreBookDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
       appBar: AppBar(
         title: Text('Books in Genre: $genre'),
         elevation: 0,
-        backgroundColor: Colors.black,
+        backgroundColor: isDark ? Colors.black : Colors.white,
       ),
-      body: _buildBody(),
+      body: _buildBody(isDark),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(bool isDark) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('books')
@@ -29,53 +31,27 @@ class GenreBookDetailScreen extends StatelessWidget {
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (snapshot.hasError) {
-          return _buildErrorState(snapshot.error.toString());
-        }
-
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState();
+          return Center(
+            child: Text('No books found for genre: $genre'),
+          );
         }
 
         final groupedBooks = _groupBooksByTitle(snapshot.data!.docs);
-        return _buildBookGrid(groupedBooks);
+        return _buildBookGrid(groupedBooks, isDark);
       },
     );
   }
 
-  Widget _buildErrorState(String error) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, size: 60, color: Colors.red),
-          const SizedBox(height: 16),
-          Text('Error: $error'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.book_outlined, size: 60, color: Colors.grey),
-          const SizedBox(height: 16),
-          Text('No books found for genre: $genre'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBookGrid(Map<String, Map<String, dynamic>> groupedBooks) {
+  Widget _buildBookGrid(Map<String, Map<String, dynamic>> books, bool isDark) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Colors.black, Colors.black87, Colors.black54],
+          colors: isDark 
+              ? [Colors.black, Colors.black87, Colors.black54]
+              : [Colors.white, Colors.white, Colors.grey[100]!],
         ),
       ),
       child: GridView.builder(
@@ -86,19 +62,20 @@ class GenreBookDetailScreen extends StatelessWidget {
           crossAxisSpacing: 12,
           mainAxisSpacing: 16,
         ),
-        itemCount: groupedBooks.length,
+        itemCount: books.length,
         itemBuilder: (context, index) => _buildBookCard(
           context,
-          groupedBooks.values.elementAt(index),
+          books.values.elementAt(index),
+          isDark,
         ),
       ),
     );
   }
 
-  Widget _buildBookCard(BuildContext context, Map<String, dynamic> book) {
+  Widget _buildBookCard(BuildContext context, Map<String, dynamic> book, bool isDark) {
     return Card(
       elevation: 4,
-      color: Colors.grey[900],
+      color: isDark ? Colors.grey[900] : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () => _navigateToDetail(context, book),
@@ -106,7 +83,7 @@ class GenreBookDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildBookImage(book),
-            _buildBookInfo(book),
+            _buildBookInfo(book, isDark),
           ],
         ),
       ),
@@ -170,7 +147,7 @@ class GenreBookDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBookInfo(Map<String, dynamic> book) {
+  Widget _buildBookInfo(Map<String, dynamic> book, bool isDark) {
     return Expanded(
       flex: 2,
       child: Padding(
@@ -181,10 +158,10 @@ class GenreBookDetailScreen extends StatelessWidget {
           children: [
             Text(
               book['title'] ?? 'No Title',
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
-                color: Colors.white,
+                color: isDark ? Colors.white : Colors.black,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -192,7 +169,10 @@ class GenreBookDetailScreen extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               book['writer'] ?? 'Unknown Writer',
-              style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+              style: TextStyle(
+                fontSize: 12, 
+                color: isDark ? Colors.grey[400] : Colors.grey[700]
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

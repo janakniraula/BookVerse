@@ -11,11 +11,11 @@ import '../utils/helpers/helper_function.dart';
 
 class AdminNavigationController extends GetxController {
   static AdminNavigationController get instance => Get.find();
-  int selectedIndex = 2;
+  
+  final Rx<int> selectedIndex = 2.obs;
 
   void changeIndex(int index) {
-    selectedIndex = index;
-    update();
+    selectedIndex.value = index;
   }
 }
 
@@ -57,7 +57,7 @@ class AdminNavigationMenu extends StatelessWidget {
       init: AdminNavigationController(),
       builder: (controller) {
         return Scaffold(
-          bottomNavigationBar: NavigationBarTheme(
+          bottomNavigationBar: Obx(() => NavigationBarTheme(
             data: NavigationBarThemeData(
               labelTextStyle: MaterialStateProperty.all(
                 TextStyle(
@@ -70,7 +70,7 @@ class AdminNavigationMenu extends StatelessWidget {
             child: NavigationBar(
               height: 65,
               elevation: 0,
-              selectedIndex: controller.selectedIndex,
+              selectedIndex: controller.selectedIndex.value,
               backgroundColor: darkMode ? TColors.black : TColors.white,
               indicatorColor: darkMode
                   ? TColors.white.withOpacity(0.1)
@@ -80,38 +80,38 @@ class AdminNavigationMenu extends StatelessWidget {
                 _buildNavDestination(
                   Iconsax.book_1,
                   'Add Books',
-                  controller.selectedIndex == 0,
+                  controller.selectedIndex.value == 0,
                   darkMode,
                 ),
                 _buildNavDestination(
                   Iconsax.edit,
                   'Edit',
-                  controller.selectedIndex == 1,
+                  controller.selectedIndex.value == 1,
                   darkMode,
                 ),
                 _buildNavDestination(
                   Iconsax.home,
                   'Dashboard',
-                  controller.selectedIndex == 2,
+                  controller.selectedIndex.value == 2,
                   darkMode,
                 ),
                 _buildNavDestination(
                   Iconsax.message_question,
                   'Requests',
-                  controller.selectedIndex == 3,
+                  controller.selectedIndex.value == 3,
                   darkMode,
                 ),
                 _buildNavDestination(
                   Iconsax.setting,
                   'Settings',
-                  controller.selectedIndex == 4,
+                  controller.selectedIndex.value == 4,
                   darkMode,
                 ),
               ],
             ),
-          ),
-          body: IndexedStack(
-            index: controller.selectedIndex,
+          )),
+          body: Obx(() => IndexedStack(
+            index: controller.selectedIndex.value,
             children: const [
               AddBooks(),
               SearchBookScreen(),
@@ -119,7 +119,7 @@ class AdminNavigationMenu extends StatelessWidget {
               AdminUserRequestsScreen(),
               AdminSettingsScreen(),
             ],
-          ),
+          )),
         );
       },
     );

@@ -350,4 +350,52 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
     );
   }
+
+  static Widget buildSearchField({
+    required TextEditingController controller,
+    required FocusNode focusNode,
+    required Function(String) onSearch,
+    required VoidCallback onClear,
+  }) {
+    return TextField(
+      controller: controller,
+      focusNode: focusNode,
+      onChanged: onSearch,
+      decoration: InputDecoration(
+        labelText: 'Search books by title, author, or course',
+        hintText: 'Enter your search term',
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(30.0),
+        ),
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: controller.text.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: onClear,
+              )
+            : null,
+      ),
+    );
+  }
+
+  static Future<List<DocumentSnapshot>> performSearch(
+    List<DocumentSnapshot> allBooks,
+    String searchQuery,
+  ) async {
+    if (searchQuery.isEmpty) {
+      return [];
+    }
+
+    final uppercaseQuery = searchQuery.toUpperCase();
+    return allBooks.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final title = (data['title'] as String?)?.toUpperCase() ?? '';
+      final writer = (data['writer'] as String?)?.toUpperCase() ?? '';
+      final course = (data['course'] as String?)?.toUpperCase() ?? '';
+
+      return title.contains(uppercaseQuery) ||
+          writer.contains(uppercaseQuery) ||
+          course.contains(uppercaseQuery);
+    }).toList();
+  }
 }

@@ -140,24 +140,33 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
   Map<String, double> _createBookVector(Map<String, dynamic> book) {
     Map<String, double> vector = {};
     
-    // Extract and process features
+    // Extract features
     String writer = (book['writer'] ?? '').toString().toLowerCase();
     List<String> genres = (book['genre'] as List<dynamic>? ?? [])
         .map((g) => g.toString().toLowerCase())
         .toList();
     String course = (book['course'] ?? '').toString().toLowerCase();
+    String title = (book['title'] ?? '').toString().toLowerCase();
     
-    // Add writer feature with higher weight
-    vector['writer_$writer'] = 3.0;
+    // Writer feature (high weight as it's very important)
+    vector['writer_$writer'] = 4.0;
     
-    // Add genre features
+    // Genre features (medium-high weight as they're important for recommendations)
     for (String genre in genres) {
-      vector['genre_$genre'] = 1.0;
+      vector['genre_$genre'] = 2.5;
     }
     
-    // Add course feature
+    // Course feature (medium weight)
     if (course.isNotEmpty) {
       vector['course_$course'] = 2.0;
+    }
+    
+    // Title keywords (lower weight but still relevant)
+    List<String> titleWords = title.split(' ')
+      .where((word) => word.length > 3) // Only consider meaningful words
+      .toList();
+    for (String word in titleWords) {
+      vector['title_$word'] = 1.0;
     }
     
     return vector;
@@ -166,12 +175,12 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
   // Update the recommendation system
   Future<List<Map<String, dynamic>>> _getRecommendedBooks(String userId) async {
     try {
-      // Get user's recent searches
+      // Get user's recent searches with timestamps
       final searchedBooksSnapshot = await _firestore
           .collection('searchedBooks')
           .where('userId', isEqualTo: userId)
           .orderBy('searchedAt', descending: true)
-          .limit(5)
+          .limit(10) // Increased limit for better profile
           .get();
 
       if (searchedBooksSnapshot.docs.isEmpty) {
@@ -182,42 +191,60 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
       // Get all books for comparison
       final allBooksSnapshot = await _firestore
           .collection('books')
-          .limit(100) // Limit for performance
+          .limit(200) // Increased limit for better recommendations
           .get();
 
-      // Create user profile vector based on search history
+      // Create user profile vector with time decay
       Map<String, double> userProfile = {};
       final searchedBooks = searchedBooksSnapshot.docs;
+      final now = DateTime.now();
       
       for (var doc in searchedBooks) {
         final bookVector = _createBookVector(doc.data());
-        // Combine vectors with decay factor based on search order
-        double decayFactor = 1.0;
+        final searchedAt = (doc.data()['searchedAt'] as Timestamp).toDate();
+        
+        // Calculate time-based decay factor (exponential decay over days)
+        final daysDifference = now.difference(searchedAt).inDays;
+        final timeDecay = exp(-0.1 * daysDifference); // Adjust decay rate as needed
+        
+        // Combine vectors with time decay
         bookVector.forEach((key, value) {
-          userProfile[key] = (userProfile[key] ?? 0.0) + value * decayFactor;
-          decayFactor *= 0.8; // Decay factor for older searches
+          userProfile[key] = (userProfile[key] ?? 0.0) + value * timeDecay;
         });
       }
 
-      // Calculate similarity scores for all books
+      // Calculate similarity scores and ensure diversity
       List<MapEntry<double, Map<String, dynamic>>> scoredBooks = [];
+      Set<String> selectedAuthors = {}; // Track selected authors for diversity
       
       for (var doc in allBooksSnapshot.docs) {
         final bookData = doc.data();
         final bookVector = _createBookVector(bookData);
         final similarity = _calculateCosineSimilarity(userProfile, bookVector);
         
-        if (similarity > 0) { // Only include books with some similarity
+        if (similarity > 0.1) { // Minimum similarity threshold
+          final author = bookData['writer']?.toString().toLowerCase() ?? '';
+          
+          // Apply diversity penalty if author already selected
+          double diversityFactor = selectedAuthors.contains(author) ? 0.7 : 1.0;
+          
           scoredBooks.add(MapEntry(
-            similarity,
+            similarity * diversityFactor,
             _processBookData(bookData, doc.id),
           ));
         }
       }
 
-      // Sort by similarity score and take top results
+      // Sort by final score and take top results
       scoredBooks.sort((a, b) => b.key.compareTo(a.key));
-      return scoredBooks.take(10).map((e) => e.value).toList();
+      final recommendations = scoredBooks.take(10).map((e) => e.value).toList();
+      
+      // Update selected authors for future diversity checks
+      for (var book in recommendations) {
+        selectedAuthors.add(book['writer']?.toString().toLowerCase() ?? '');
+      }
+
+      return recommendations;
     } catch (e) {
       print('Error getting recommendations: $e');
       return [];

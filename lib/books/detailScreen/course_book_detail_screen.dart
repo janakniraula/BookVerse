@@ -27,8 +27,9 @@ class CourseBookDetailScreen extends StatefulWidget {
 
 class _CourseBookDetailScreenState extends State<CourseBookDetailScreen> {
   bool isBookmarked = false;
-  bool isOutOfStock = false; // Track if the book is out of stock
+  bool isOutOfStock = false;
   late String userId;
+  bool _mounted = true;
 
   @override
   void initState() {
@@ -36,38 +37,49 @@ class _CourseBookDetailScreenState extends State<CourseBookDetailScreen> {
     _initializeUserId();
   }
 
+  @override
+  void dispose() {
+    _mounted = false;
+    super.dispose();
+  }
+
   Future<void> _initializeUserId() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      userId = user.uid; // Get the user ID from Firebase Auth
-      await _checkIfBookmarked();
-      await _checkAvailability();
-    } else {
-      // Handle the case where the user is not logged in
-      // e.g., navigate to the login screen
+      userId = user.uid;
+      if (_mounted) {
+        await _checkIfBookmarked();
+        await _checkAvailability();
+      }
     }
   }
 
   Future<void> _checkIfBookmarked() async {
+    if (!_mounted) return;
+    
     final snapshot = await FirebaseFirestore.instance
         .collection('bookmarks')
         .where('title', isEqualTo: widget.title)
         .where('userId', isEqualTo: userId)
         .get();
 
-    setState(() {
-      isBookmarked = snapshot.docs.isNotEmpty;
-    });
+    if (_mounted) {
+      setState(() {
+        isBookmarked = snapshot.docs.isNotEmpty;
+      });
+    }
   }
 
   Future<void> _checkAvailability() async {
+    if (!_mounted) return;
+
     final snapshot = await FirebaseFirestore.instance
-        .collection('books') // Adjust the collection name as needed
+        .collection('books')
         .where('title', isEqualTo: widget.title)
         .limit(1)
         .get();
 
-    if (snapshot.docs.isNotEmpty) {
+    if (snapshot.docs.isNotEmpty && _mounted) {
       final bookData = snapshot.docs.first.data();
       setState(() {
         isOutOfStock = (bookData['numberOfCopies'] ?? 0) <= 0;
@@ -100,22 +112,27 @@ class _CourseBookDetailScreenState extends State<CourseBookDetailScreen> {
   }
 
   Future<void> _addBookmark(Map<String, dynamic> bookData) async {
+    if (!_mounted) return;
+
     try {
-      // Fetch the bookId from the 'books' collection based on the book's title
       final bookSnapshot = await FirebaseFirestore.instance
           .collection('books')
-          .where('title', isEqualTo: widget.title) // Use an appropriate field to find the book
+          .where('title', isEqualTo: widget.title)
           .limit(1)
           .get();
 
+      if (!_mounted) return;
+
       if (bookSnapshot.docs.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Book not found')));
+        if (_mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Book not found'))
+          );
+        }
         return;
       }
 
       final bookId = bookSnapshot.docs.first.id;
-
-      // Include 'bookId' in the bookData
       final bookDataWithId = {
         ...bookData,
         'bookId': bookId,
@@ -123,43 +140,72 @@ class _CourseBookDetailScreenState extends State<CourseBookDetailScreen> {
       };
 
       final docRef = await FirebaseFirestore.instance.collection('bookmarks').add(bookDataWithId);
+      
+      if (!_mounted) return;
+
       Provider.of<BookmarkProvider>(context, listen: false).addBookmark({
         ...bookDataWithId,
         'id': docRef.id,
       });
-      setState(() {
-        isBookmarked = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${widget.title} Added')));
+      
+      if (_mounted) {
+        setState(() {
+          isBookmarked = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${widget.title} Added'))
+        );
+      }
     } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to Add: $error')));
+      if (_mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to Add: $error'))
+        );
+      }
     }
   }
 
   Future<void> _removeBookmark(Map<String, dynamic> bookData) async {
+    if (!_mounted) return;
+
     final snapshot = await FirebaseFirestore.instance
         .collection('bookmarks')
         .where('title', isEqualTo: widget.title)
         .where('userId', isEqualTo: userId)
         .get();
 
+    if (!_mounted) return;
+
     if (snapshot.docs.isNotEmpty) {
       final docId = snapshot.docs.first.id;
       try {
         await FirebaseFirestore.instance.collection('bookmarks').doc(docId).delete();
+        
+        if (!_mounted) return;
+
         Provider.of<BookmarkProvider>(context, listen: false).removeBookmark({
           ...bookData,
           'id': docId,
         });
-        setState(() {
-          isBookmarked = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${widget.title} removed')));
+        
+        if (_mounted) {
+          setState(() {
+            isBookmarked = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${widget.title} removed'))
+          );
+        }
       } catch (error) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to remove: $error')));
+        if (_mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to remove: $error'))
+          );
+        }
       }
     }
   }
+
   Future<void> _viewPDFs() async {
     final snapshot = await FirebaseFirestore.instance
         .collection('books')

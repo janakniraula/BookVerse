@@ -8,6 +8,7 @@ import '../BookIssue/Issuing.dart';
 import '../USersScreen/allUser.dart';
 import '../allbooks.dart';
 import '../returnedbooks/bookreturn.dart';
+import 'package:book_Verse/utils/helpers/helper_function.dart';
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -19,7 +20,6 @@ class Dashboard extends StatefulWidget {
 class _DashboardState extends State<Dashboard> {
   final _firestore = FirebaseFirestore.instance;
   late Future<List<QuerySnapshot>> _futureData;
-  final Color lightGreen = const Color(0xFF0C8904);
 
   @override
   void initState() {
@@ -39,10 +39,12 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = THelperFunction.isDarkMode(context);
+    
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: isDark ? TColors.black : TColors.white,
       body: RefreshIndicator(
-        color: lightGreen,
+        color: TColors.primaryColor,
         onRefresh: () async => setState(() => _loadData()),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -57,7 +59,7 @@ class _DashboardState extends State<Dashboard> {
                   ],
                 ),
               ),
-              _buildDashboardContent(),
+              _buildDashboardContent(isDark),
             ],
           ),
         ),
@@ -65,7 +67,7 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  Widget _buildDashboardContent() {
+  Widget _buildDashboardContent(bool isDark) {
     return FutureBuilder<List<QuerySnapshot>>(
       future: _futureData,
       builder: (context, snapshot) {
@@ -91,7 +93,7 @@ class _DashboardState extends State<Dashboard> {
                   ElevatedButton(
                     onPressed: () => setState(() => _loadData()),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: lightGreen,
+                      backgroundColor: TColors.primaryColor,
                       foregroundColor: Colors.white,
                     ),
                     child: const Text('Retry'),
@@ -105,26 +107,16 @@ class _DashboardState extends State<Dashboard> {
         final [books, users, issuedBooks, returnedBooks, notifications] = snapshot.data!;
 
         return Container(
-          color: Colors.black,
-          padding: const EdgeInsets.all(16.0),
+          color: isDark ? TColors.black : TColors.white,
+          padding: const EdgeInsets.all(TSizes.defaultSpace),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildStatCard(
-                'Total Books',
-                Icons.book,
-                books.size.toString(),
-                const AllBooksScreenAdmin(),
-              ),
-              _buildStatCard(
-                'Total Users',
-                Icons.people,
-                users.size.toString(),
-                const AllUsersScreen(),
-              ),
-              _buildNotificationsSection(context, notifications.size),
-              _buildIssuedBooksSection(issuedBooks.docs),
-              _buildReturnedBooksSection(returnedBooks.docs),
+              _buildStatCard('Total Books', Icons.book, books.size.toString(), const AllBooksScreenAdmin(), isDark),
+              _buildStatCard('Total Users', Icons.people, users.size.toString(), const AllUsersScreen(), isDark),
+              _buildNotificationsSection(context, notifications.size, isDark),
+              _buildIssuedBooksSection(issuedBooks.docs, isDark),
+              _buildReturnedBooksSection(returnedBooks.docs, isDark),
             ],
           ),
         );
@@ -132,58 +124,52 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  Widget _buildStatCard(String title, IconData icon, String value, Widget destination) {
+  Widget _buildStatCard(String title, IconData icon, String value, Widget destination, bool isDark) {
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => destination),
-      ),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => destination)),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(20),
+        margin: const EdgeInsets.only(bottom: TSizes.spaceBtwItems),
+        padding: const EdgeInsets.all(TSizes.md),
         decoration: BoxDecoration(
-          color: Colors.black,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: Colors.grey.withOpacity(0.2)),
+          color: isDark ? TColors.black : TColors.white,
+          borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
+          border: Border.all(color: isDark ? TColors.darkGrey : TColors.grey),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(TSizes.sm),
               decoration: BoxDecoration(
-                color: lightGreen.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                color: TColors.primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(TSizes.cardRadiusMd),
               ),
-              child: Icon(icon, color: lightGreen, size: 24),
+              child: Icon(icon, color: TColors.primaryColor, size: 24),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: TSizes.spaceBtwItems),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: isDark ? TColors.white : TColors.black,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: TSizes.xs),
                   Text(
                     value,
-                    style: TextStyle(
-                      color: lightGreen,
-                      fontSize: 24,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: TColors.primaryColor,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(
+            Icon(
               Icons.arrow_forward_ios,
-              color: Colors.grey,
+              color: isDark ? TColors.white : TColors.black,
               size: 20,
             ),
           ],
@@ -192,13 +178,13 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  Widget _buildNotificationsSection(BuildContext context, int notificationCount) {
+  Widget _buildNotificationsSection(BuildContext context, int notificationCount, bool isDark) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.black,
+        color: isDark ? TColors.black : TColors.white,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        border: Border.all(color: isDark ? TColors.darkGrey : TColors.grey),
       ),
       child: Theme(
         data: Theme.of(context).copyWith(
@@ -221,10 +207,10 @@ class _DashboardState extends State<Dashboard> {
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: lightGreen.withOpacity(0.1),
+                  color: TColors.primaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.notifications, color: lightGreen, size: 20),
+                child: Icon(Icons.notifications, color: TColors.primaryColor, size: 20),
               ),
               tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -236,7 +222,7 @@ class _DashboardState extends State<Dashboard> {
                   const Text(
                     'Recent Notifications',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: TColors.black,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
@@ -245,13 +231,13 @@ class _DashboardState extends State<Dashboard> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: lightGreen.withOpacity(0.1),
+                      color: TColors.primaryColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       notificationCount.toString(),
                       style: TextStyle(
-                        color: lightGreen,
+                        color: TColors.primaryColor,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -261,7 +247,7 @@ class _DashboardState extends State<Dashboard> {
               ),
               children: [
                 Container(
-                  color: Colors.black,
+                  color: isDark ? TColors.black : TColors.white,
                   constraints: BoxConstraints(
                     maxHeight: notifications.length > 3 ? 200 : notifications.length * 72.0,
                     minHeight: 0,
@@ -276,19 +262,19 @@ class _DashboardState extends State<Dashboard> {
                         title: Text(
                           data['message'] ?? 'No message',
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: TColors.black,
                             fontSize: 14,
                           ),
                         ),
                         subtitle: Text(
                           _formatDate(data['timestamp'] as Timestamp),
                           style: const TextStyle(
-                            color: Colors.grey,
+                            color: TColors.grey,
                             fontSize: 12,
                           ),
                         ),
                         trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                          icon: const Icon(Icons.delete, color: TColors.error, size: 20),
                           onPressed: () => _deleteNotification(notifications[index].id),
                         ),
                       );
@@ -303,21 +289,23 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  Widget _buildIssuedBooksSection(List<QueryDocumentSnapshot> issuedBooks) {
+  Widget _buildIssuedBooksSection(List<QueryDocumentSnapshot> issuedBooks, bool isDark) {
     return _buildExpandableSection(
       'Issued Books',
       Icons.book_online,
       issuedBooks,
           (userId) => IssuedBooksScreen(userId: userId),
+      isDark,
     );
   }
 
-  Widget _buildReturnedBooksSection(List<QueryDocumentSnapshot> returnedBooks) {
+  Widget _buildReturnedBooksSection(List<QueryDocumentSnapshot> returnedBooks, bool isDark) {
     return _buildExpandableSection(
       'Returned Books',
       Icons.assignment_return,
       returnedBooks,
           (userId) => AcceptReturnedBooksScreen(userId: userId),
+      isDark,
     );
   }
 
@@ -326,13 +314,14 @@ class _DashboardState extends State<Dashboard> {
       IconData icon,
       List<QueryDocumentSnapshot> docs,
       Widget Function(String) destinationBuilder,
+      bool isDark,
       ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.black,
+        color: isDark ? TColors.black : TColors.white,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        border: Border.all(color: isDark ? TColors.darkGrey : TColors.grey),
       ),
       child: Theme(
         data: Theme.of(context).copyWith(
@@ -344,10 +333,10 @@ class _DashboardState extends State<Dashboard> {
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: lightGreen.withOpacity(0.1),
+              color: TColors.primaryColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: lightGreen, size: 20),
+            child: Icon(icon, color: TColors.primaryColor, size: 20),
           ),
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -359,7 +348,7 @@ class _DashboardState extends State<Dashboard> {
               Text(
                 title,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: TColors.black,
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
@@ -368,13 +357,13 @@ class _DashboardState extends State<Dashboard> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: lightGreen.withOpacity(0.1),
+                  color: TColors.primaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   docs.length.toString(),
-                  style: TextStyle(
-                    color: lightGreen,
+                  style: const TextStyle(
+                    color: TColors.primaryColor,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
@@ -384,7 +373,7 @@ class _DashboardState extends State<Dashboard> {
           ),
           children: [
             Container(
-              color: Colors.black,
+              color: isDark ? TColors.black : TColors.white,
               constraints: BoxConstraints(
                 maxHeight: docs.length > 3 ? 200 : docs.length * 72.0,
                 minHeight: 0,
@@ -405,18 +394,18 @@ class _DashboardState extends State<Dashboard> {
                         title: Text(
                           userData?['UserName'] ?? 'Unknown User',
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: TColors.black,
                             fontSize: 14,
                           ),
                         ),
                         subtitle: Text(
                           userData?['Email'] ?? 'No email',
                           style: const TextStyle(
-                            color: Colors.grey,
+                            color: TColors.grey,
                             fontSize: 12,
                           ),
                         ),
-                        trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 18),
+                        trailing: const Icon(Icons.arrow_forward_ios, color: TColors.grey, size: 18),
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(builder: (_) => destinationBuilder(userId)),
@@ -445,7 +434,7 @@ class _DashboardState extends State<Dashboard> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Notification deleted'),
-            backgroundColor: Colors.green,
+            backgroundColor: TColors.success,
           ),
         );
       }
@@ -454,7 +443,7 @@ class _DashboardState extends State<Dashboard> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: TColors.error,
           ),
         );
       }

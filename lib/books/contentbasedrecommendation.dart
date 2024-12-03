@@ -228,10 +228,10 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
       children: [
         TSectionHeading(
           title: 'Popular Books',
-          fontSize: 20,
+          fontSize: 25,
           onPressed: _fetchRecommendations,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         if (_isLoading)
           const Center(
             child: Padding(
@@ -251,7 +251,7 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
           )
         else
           SizedBox(
-            height: 280,
+            height: 320,
             child: CarouselSlider.builder(
               itemCount: _recommendedBooks.length,
               itemBuilder: (context, index, realIndex) {
@@ -263,14 +263,14 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
                 return GestureDetector(
                   onTap: () => _navigateToDetailPage(book),
                   child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: 180,
-                    constraints: const BoxConstraints(maxHeight: 280),
+                    margin: const EdgeInsets.symmetric(horizontal: 5),
+                    width: 200,
+                    constraints: const BoxConstraints(maxHeight: 320),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
-                          height: 200,
+                          height: 220,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: const [
@@ -287,8 +287,8 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
                             child: imageUrl.isNotEmpty
                                 ? Image.network(
                                     imageUrl,
-                                    width: 140,
-                                    height: 200,
+                                    width: 150,
+                                    height: 220,
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) {
                                       print('Image Error: $error');
@@ -333,8 +333,8 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
                 );
               },
               options: CarouselOptions(
-                height: 280,
-                viewportFraction: 0.45,
+                height: 320,
+                viewportFraction: 0.5,
                 enlargeCenterPage: true,
                 enableInfiniteScroll: _recommendedBooks.length > 1,
                 autoPlay: _recommendedBooks.length > 1,
@@ -376,7 +376,10 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
           imageUrl: book['imageUrl'],
           course: book['course'],
           summary: book['summary'],
-          genre: (book['genre'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
+          genre: (book['genre'] as List<dynamic>?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              [],
         ),
       ),
     );

@@ -5,6 +5,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
+import 'package:book_Verse/utils/constants/colors.dart';
+import 'package:book_Verse/utils/helpers/helper_function.dart';
 
 class AddBooks extends StatefulWidget {
   const AddBooks({super.key});
@@ -234,213 +236,373 @@ class _AddBooksState extends State<AddBooks> {
 
   @override
   Widget build(BuildContext context) {
+    final dark = THelperFunction.isDarkMode(context);
+    
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Books'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: TColors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Add Books',
+          style: TextStyle(color: TColors.white),
+        ),
         centerTitle: true,
+        backgroundColor: TColors.primaryColor,
+        foregroundColor: TColors.white,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextFormField(
-                controller: _numberOfBooksController,
-                decoration: const InputDecoration(
-                  labelText: 'Number of Copies',
-                  prefixIcon: Icon(Icons.numbers),
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Enter the number of copies';
-                  }
-                  final numCopies = int.tryParse(value);
-                  if (numCopies == null || numCopies < 0) {
-                    return 'Number of copies must be 0 or greater';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text('Is this a course book?'),
-                value: _isCourseBook,
-                onChanged: (value) {
-                  setState(() {
-                    _isCourseBook = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-              _buildTextFormField(
-                  _titleController, 'Book Title', Icons.book),
-              const SizedBox(height: 16),
-              _buildStringValidatedTextFormField(
-                  _writerController, 'Writer', Icons.person),
-              const SizedBox(height: 16),
-              if (!_isCourseBook)
-                _buildStringValidatedTextFormField(
-                    _genreController, 'Genre (comma-separated)', Icons.category),
-              if (_isCourseBook)
-                Column(
-                  children: [
-                    _buildTextFormField(
-                        _courseController, 'Year / Semester', Icons.calendar_today),
-                    const SizedBox(height: 16),
-                    _buildTextFormField(_gradeController, 'Grade', Icons.grade),
-                  ],
-                ),
-              const SizedBox(height: 16),
-              _buildTextFormField(
-                  _summaryController, 'Summary', Icons.description,
-                  maxLines: 3),
-              const SizedBox(height: 20),
-              if (_image != null)
-                Stack(
-                  alignment: Alignment.topRight,
-                  children: [
-                    Image.file(
-                      _image!,
-                      height: 150,
-                      width: 150,
-                      fit: BoxFit.cover,
-                    ),
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _image = null; // Clear the selected image
-                          });
-                        },
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _pickImage,
-                      icon: const Icon(Icons.image),
-                      label: const Text('Pick Image'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _pickPDFs,
-                      icon: const Icon(Icons.picture_as_pdf),
-                      label: const Text('Pick PDFs'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              if (_pdfs.isNotEmpty)
-                Column(
-                  children: _pdfs.map((pdf) {
-                    return Card(
-                      child: ListTile(
-                        title: Text(pdf['name']),
-                        subtitle: TextField(
-                          controller: pdf['description'],
-                          decoration: const InputDecoration(
-                            labelText: 'Description (optional)',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.close, color: Colors.red),
-                          onPressed: () {
-                            setState(() {
-                              _pdfs.remove(pdf);
-                            });
-                          },
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              const SizedBox(height: 20),
-              Center(
-                child: ElevatedButton.icon(
-                  onPressed: _addBooks,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Books'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 25.0),
-                    textStyle: const TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ],
+      body: Container(
+        color: dark ? TColors.dark : TColors.light,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              children: [
+                _buildSwitchTile(dark),
+                const SizedBox(height: 20),
+                _buildMainForm(dark),
+                const SizedBox(height: 20),
+                _buildImageSection(dark),
+                const SizedBox(height: 20),
+                _buildPDFSection(dark),
+                const SizedBox(height: 20),
+                _buildActionButton(dark),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildStringValidatedTextFormField(
-      TextEditingController controller, String labelText, IconData icon) {
-    return TextFormField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: labelText,
-        prefixIcon: Icon(icon),
-        border: const OutlineInputBorder(),
+  Widget _buildSwitchTile(bool dark) {
+    return Card(
+      color: dark ? TColors.darkContainer : TColors.white,
+      elevation: 0,
+      child: SwitchListTile(
+        title: Text(
+          'Is this a course book?',
+          style: TextStyle(
+            color: dark ? TColors.white : TColors.black,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        value: _isCourseBook,
+        activeColor: TColors.primaryColor,
+        onChanged: (value) => setState(() => _isCourseBook = value),
       ),
-      validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return 'Please enter a valid $labelText';
-        }
-        if (RegExp(r'\d').hasMatch(value)) {
-          return '$labelText should not contain numbers';
-        }
-        return null;
-      },
     );
   }
 
+  Widget _buildMainForm(bool dark) {
+    return Column(
+      children: [
+        _buildCustomTextField(
+          _numberOfBooksController,
+          'Number of Copies',
+          Icons.numbers,
+          'Please enter the number of copies',
+          dark,
+          keyboardType: TextInputType.number,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Enter the number of copies';
+            }
+            final numCopies = int.tryParse(value);
+            if (numCopies == null || numCopies < 0) {
+              return 'Number of copies must be 0 or greater';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 10),
+        _buildCustomTextField(
+          _titleController,
+          'Book Title',
+          Icons.book,
+          'Please enter the book title',
+          dark,
+        ),
+        const SizedBox(height: 10),
+        _buildCustomTextField(
+          _writerController,
+          'Writer',
+          Icons.person,
+          'Please enter the writer name',
+          dark,
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Please enter a valid writer name';
+            }
+            if (RegExp(r'\d').hasMatch(value)) {
+              return 'Writer name should not contain numbers';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 10),
+        if (!_isCourseBook) ...[
+          _buildCustomTextField(
+            _genreController,
+            'Genre (comma-separated)',
+            Icons.category,
+            'Please enter genres',
+            dark,
+          ),
+        ],
+        if (_isCourseBook) ...[
+          _buildCustomTextField(
+            _courseController,
+            'Year / Semester',
+            Icons.calendar_today,
+            'Please enter year/semester',
+            dark,
+          ),
+          const SizedBox(height: 10),
+          _buildCustomTextField(
+            _gradeController,
+            'Grade',
+            Icons.grade,
+            'Please enter the grade',
+            dark,
+          ),
+        ],
+        const SizedBox(height: 10),
+        _buildCustomTextField(
+          _summaryController,
+          'Summary',
+          Icons.description,
+          'Please enter a summary',
+          dark,
+          maxLines: 3,
+        ),
+      ],
+    );
+  }
 
-  // Helper method to build text form fields
-  Widget _buildTextFormField(TextEditingController controller, String label, IconData icon,
-      {int maxLines = 1}) {
-    return TextFormField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        border: const OutlineInputBorder(),
+  Widget _buildCustomTextField(
+    TextEditingController controller,
+    String label,
+    IconData icon,
+    String validatorMessage,
+    bool dark, {
+    int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
+  }) {
+    return Card(
+      color: dark ? TColors.darkContainer : TColors.white,
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: TextFormField(
+          controller: controller,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          style: TextStyle(color: dark ? TColors.white : TColors.black),
+          decoration: InputDecoration(
+            labelText: label,
+            labelStyle: TextStyle(
+              color: dark ? TColors.white.withOpacity(0.7) : TColors.black.withOpacity(0.87)
+            ),
+            prefixIcon: Icon(icon, color: TColors.primaryColor),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: dark ? TColors.darkGrey : TColors.grey),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: dark ? TColors.darkGrey : TColors.grey),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: TColors.primaryColor),
+            ),
+          ),
+          validator: validator ?? (value) {
+            if (value!.isEmpty) {
+              return validatorMessage;
+            }
+            return null;
+          },
+        ),
       ),
-      maxLines: maxLines,
-      validator: (value) => value!.isEmpty ? 'Please enter $label' : null,
+    );
+  }
+
+  Widget _buildImageSection(bool dark) {
+    return Card(
+      color: dark ? TColors.darkContainer : TColors.white,
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Book Cover Image',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: dark ? TColors.white : TColors.black,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_image != null) _buildImagePreview(dark),
+            const SizedBox(height: 16),
+            _buildImagePickerButton(dark),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImagePreview(bool dark) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: TColors.primaryColor.withOpacity(0.5)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              height: 200,
+              width: double.infinity,
+              child: Image.file(_image!, fit: BoxFit.cover),
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: IconButton(
+              onPressed: () => setState(() => _image = null),
+              icon: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: TColors.error.withOpacity(0.9),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: TColors.white, size: 20),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImagePickerButton(bool dark) {
+    return ElevatedButton.icon(
+      onPressed: _pickImage,
+      icon: const Icon(Icons.image),
+      label: const Text('Pick Image'),
+      style: ElevatedButton.styleFrom(
+        foregroundColor: TColors.white,
+        backgroundColor: TColors.primaryColor,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  Widget _buildPDFSection(bool dark) {
+    return Card(
+      color: dark ? TColors.darkContainer : TColors.white,
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'PDF Documents',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: dark ? TColors.white : TColors.black,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_pdfs.isNotEmpty) ...[
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _pdfs.length,
+                itemBuilder: (context, index) => _buildPDFItem(_pdfs[index], dark),
+              ),
+              const SizedBox(height: 16),
+            ],
+            _buildPDFPickerButton(dark),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPDFItem(Map<String, dynamic> pdf, bool dark) {
+    return Card(
+      color: dark ? TColors.darkContainer.withOpacity(0.3) : TColors.lightContainer,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        title: Text(
+          pdf['name'],
+          style: TextStyle(
+            color: dark ? TColors.white.withOpacity(0.7) : TColors.black.withOpacity(0.87)
+          ),
+        ),
+        subtitle: TextField(
+          controller: pdf['description'],
+          style: TextStyle(
+            color: dark ? TColors.white.withOpacity(0.7) : TColors.black.withOpacity(0.54)
+          ),
+          decoration: InputDecoration(
+            labelText: 'Description (optional)',
+            labelStyle: TextStyle(
+              color: dark ? TColors.white.withOpacity(0.7) : TColors.black.withOpacity(0.54)
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        trailing: IconButton(
+          icon: Icon(Icons.close, color: TColors.error),
+          onPressed: () => setState(() => _pdfs.remove(pdf)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPDFPickerButton(bool dark) {
+    return ElevatedButton.icon(
+      onPressed: _pickPDFs,
+      icon: const Icon(Icons.picture_as_pdf),
+      label: const Text('Pick PDFs'),
+      style: ElevatedButton.styleFrom(
+        foregroundColor: TColors.white,
+        backgroundColor: TColors.primaryColor,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  Widget _buildActionButton(bool dark) {
+    return ElevatedButton.icon(
+      onPressed: _addBooks,
+      icon: const Icon(Icons.add),
+      label: const Text('Add Book'),
+      style: ElevatedButton.styleFrom(
+        foregroundColor: TColors.white,
+        backgroundColor: TColors.success,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        minimumSize: const Size(double.infinity, 50),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     );
   }
 }

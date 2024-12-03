@@ -6,6 +6,7 @@ import 'package:book_Verse/features/home/screens/user/mark/provider.dart';
 import 'package:book_Verse/features/home/screens/user/mark/requestssss.dart';
 import '../../../../../books/detailScreen/course_book_detail_screen.dart';
 import '../../../../../utils/constants/colors.dart';
+import '../../../../../utils/helpers/helper_function.dart';
 
 class MarkApp extends StatelessWidget {
   const MarkApp({super.key});
@@ -25,7 +26,7 @@ class BookmarkScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bookmarks = Provider.of<BookmarkProvider>(context).bookmarks;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dark = THelperFunction.isDarkMode(context);
 
     final filteredBookmarks = bookmarks.where((book) {
       final title = book['title'];
@@ -41,13 +42,10 @@ class BookmarkScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Theme.of(context).colorScheme.background,
+        backgroundColor: dark ? TColors.black : TColors.white,
         title: Text(
           'Bookmark Manager',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black,
-          ),
+          style: Theme.of(context).textTheme.headlineMedium,
         ),
       ),
       body: CustomScrollView(
@@ -57,6 +55,7 @@ class BookmarkScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16.0),
               child: Card(
                 elevation: 4,
+                color: dark ? TColors.darkContainer : TColors.lightContainer,
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
@@ -66,16 +65,11 @@ class BookmarkScreen extends StatelessWidget {
                         children: [
                           Text(
                             filteredBookmarks.length.toString(),
-                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
+                            style: Theme.of(context).textTheme.headlineMedium,
                           ),
                           Text(
                             'Total Books',
-                            style: TextStyle(
-                              color: isDark ? Colors.white70 : Colors.black54,
-                            ),
+                            style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ],
                       ),
@@ -95,14 +89,13 @@ class BookmarkScreen extends StatelessWidget {
                     Icon(
                       Icons.bookmark_border,
                       size: 64,
-                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      color: dark ? TColors.darkGrey : TColors.grey,
                     ),
                     const SizedBox(height: 16),
                     Text(
                       'No bookmarks yet',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: dark ? TColors.darkGrey : TColors.grey,
                       ),
                     ),
                   ],
@@ -115,10 +108,7 @@ class BookmarkScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Text(
                   'Your Bookmarks',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
             ),
@@ -126,11 +116,11 @@ class BookmarkScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
-                      (context, index) {
+                  (context, index) {
                     final title = bookCounts.keys.elementAt(index);
                     final count = bookCounts[title]!;
                     final book = filteredBookmarks.firstWhere(
-                          (b) => b['title'] == title,
+                      (b) => b['title'] == title,
                       orElse: () => {
                         'title': '',
                         'writer': '',
@@ -142,6 +132,7 @@ class BookmarkScreen extends StatelessWidget {
 
                     return Card(
                       elevation: 2,
+                      color: dark ? TColors.darkContainer : TColors.lightContainer,
                       margin: const EdgeInsets.only(bottom: 12),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(8),
@@ -150,7 +141,7 @@ class BookmarkScreen extends StatelessWidget {
                           padding: const EdgeInsets.all(12.0),
                           child: Row(
                             children: [
-                              _buildBookImage(book),
+                              _buildBookImage(book, context),
                               const SizedBox(width: 16),
                               Expanded(
                                 child: Column(
@@ -158,29 +149,25 @@ class BookmarkScreen extends StatelessWidget {
                                   children: [
                                     Text(
                                       title,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      style: Theme.of(context).textTheme.titleMedium,
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       book['writer'] ?? '',
-                                      style: TextStyle(
-                                        color: isDark ? Colors.grey[400] : Colors.grey[600],
-                                      ),
+                                      style: Theme.of(context).textTheme.bodyMedium,
                                     ),
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
-                                        Icon(Icons.copy, size: 16, color: Colors.grey[600]),
+                                        Icon(
+                                          Icons.copy, 
+                                          size: 16, 
+                                          color: dark ? TColors.darkGrey : TColors.grey
+                                        ),
                                         const SizedBox(width: 4),
                                         Text(
                                           '$count copies',
-                                          style: TextStyle(
-                                            color: isDark ? Colors.grey[400] : Colors.grey[600],
-                                            fontSize: 12,
-                                          ),
+                                          style: Theme.of(context).textTheme.labelMedium,
                                         ),
                                       ],
                                     ),
@@ -189,7 +176,7 @@ class BookmarkScreen extends StatelessWidget {
                               ),
                               IconButton(
                                 icon: const Icon(Icons.delete_outline),
-                                color: Colors.red[400],
+                                color: TColors.error,
                                 onPressed: () => _removeBookmark(context, book),
                               ),
                             ],
@@ -212,10 +199,7 @@ class BookmarkScreen extends StatelessWidget {
                 children: [
                   Text(
                     'Requested Books',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
+                    style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
@@ -229,14 +213,7 @@ class BookmarkScreen extends StatelessWidget {
                     },
                     icon: const Icon(Icons.list_alt),
                     label: const Text('View Requested Books'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0C8904),
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
+                    style: Theme.of(context).elevatedButtonTheme.style,
                   ),
                   const SizedBox(height: 80),
                 ],
@@ -247,39 +224,40 @@ class BookmarkScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _saveBookmarksToRequests(context),
-        icon: const Icon(Icons.save),
-        label: const Text('Save All'),
-        backgroundColor: const Color(0xFF0C8904),
+        icon: const Icon(Icons.save, color: Colors.white),
+        label: const Text('Save All', style: TextStyle(color: Colors.white)),
+        backgroundColor: TColors.primaryColor,
       ),
     );
   }
 
-  Widget _buildBookImage(Map<String, dynamic> book) {
+  Widget _buildBookImage(Map<String, dynamic> book, BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: (book['imageUrl'] ?? '').isNotEmpty
           ? Image.network(
-        book['imageUrl']!,
-        width: 80,
-        height: 80,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return _buildPlaceholderImage();
-        },
-      )
-          : _buildPlaceholderImage(),
+              book['imageUrl']!,
+              width: 80,
+              height: 80,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return _buildPlaceholderImage(context);
+              },
+            )
+          : _buildPlaceholderImage(context),
     );
   }
 
-  Widget _buildPlaceholderImage() {
+  Widget _buildPlaceholderImage(BuildContext context) {
+    final dark = THelperFunction.isDarkMode(context);
     return Container(
       width: 80,
       height: 80,
-      color: Colors.grey[200],
+      color: dark ? TColors.darkGrey : TColors.grey,
       child: Icon(
         Icons.book,
         size: 40,
-        color: Colors.grey[400],
+        color: dark ? TColors.white : TColors.black,
       ),
     );
   }

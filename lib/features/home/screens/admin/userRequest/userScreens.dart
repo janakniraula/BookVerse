@@ -12,6 +12,7 @@ class UserRequestedBooksScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Requested Books'),
+        automaticallyImplyLeading: false,
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
@@ -79,59 +80,73 @@ class UserRequestedBooksScreen extends StatelessWidget {
     );
   }
 
-  // Function to accept the book and issue it to the specific user (not to all users)
-  void acceptBook(BuildContext context, Map<String, dynamic> book, List<DocumentSnapshot> requests, String adminId) async {
-    final bookId = book['bookId'];
-    final specificUserId = userId; // Ensure the book is issued only to the user who requested it
+  // Function to accept the book and issue it to the specific user
+  Future<void> acceptBook(BuildContext context, Map<String, dynamic> book, List<DocumentSnapshot> requests, String adminId) async {
+    // Store context-dependent operations early
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
+    try {
+      final bookId = book['bookId'];
+      final bookDoc = await FirebaseFirestore.instance.collection('books').doc(bookId).get();
+      
+      if (!bookDoc.exists) {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(content: Text('Book not found in the database.'))
+        );
+        return;
+      }
 
-    // Check if the book exists in the 'books' collection and has copies left
-    final bookDoc = await FirebaseFirestore.instance.collection('books').doc(bookId).get();
-    if (bookDoc.exists) {
       final bookData = bookDoc.data() as Map<String, dynamic>;
       final int numberOfCopies = bookData['numberOfCopies'];
 
-      if (numberOfCopies > 0) {
-        // Issue the book by adding it to the 'issuedBooks' collection for this specific user
-        await FirebaseFirestore.instance.collection('issuedBooks').add({
-          'userId': specificUserId, // Only issue the book to this specific user
-          'adminId': adminId,
-          'bookId': bookId,
-          'title': book['title'],
-          'writer': book['writer'],
-          'imageUrl': book['imageUrl'],
-          'issueDate': Timestamp.now(),
-          'isRead': false, // Default isRead value
-        });
-
-        // Decrease the number of copies by 1
-        await FirebaseFirestore.instance.collection('books').doc(bookId).update({
-          'numberOfCopies': numberOfCopies - 1,
-        });
-
-        // Remove the book from this user's requests collection
-        await removeBookFromRequests(book, requests);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Book accepted, issued, and number of copies updated!')),
+      if (numberOfCopies <= 0) {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(content: Text('No more copies available for this book.'))
         );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No more copies available for this book.')),
-        );
+        return;
       }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Book not found in the database.')),
+
+      // Batch write to ensure atomicity
+      final batch = FirebaseFirestore.instance.batch();
+
+      // Create issued book document
+      final issuedBookRef = FirebaseFirestore.instance.collection('issuedBooks').doc();
+      batch.set(issuedBookRef, {
+        'userId': userId,
+        'adminId': adminId,
+        'bookId': bookId,
+        'title': book['title'],
+        'writer': book['writer'],
+        'imageUrl': book['imageUrl'],
+        'issueDate': Timestamp.now(),
+        'isRead': false,
+      });
+
+      // Update book copies
+      final bookRef = FirebaseFirestore.instance.collection('books').doc(bookId);
+      batch.update(bookRef, {'numberOfCopies': numberOfCopies - 1});
+
+      await batch.commit();
+      await removeBookFromRequests(book, requests);
+
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(content: Text('Book accepted and issued successfully!'))
+      );
+    } catch (e) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}'))
       );
     }
   }
 
-  // Function to reject the book and add a comment with adminId
-  void rejectBook(BuildContext context, Map<String, dynamic> book, List<DocumentSnapshot> requests, String adminId) {
-    showDialog(
+  // Function to reject the book
+  Future<void> rejectBook(BuildContext context, Map<String, dynamic> book, List<DocumentSnapshot> requests, String adminId) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
+    await showDialog(
       context: context,
-      builder: (context) {
-        TextEditingController reasonController = TextEditingController();
+      builder: (dialogContext) {
+        final TextEditingController reasonController = TextEditingController();
 
         return AlertDialog(
           title: const Text('Reject Book'),
@@ -139,39 +154,46 @@ class UserRequestedBooksScreen extends StatelessWidget {
             controller: reasonController,
             decoration: const InputDecoration(
               labelText: 'Reason for rejection',
+              border: OutlineInputBorder(),
             ),
+            maxLines: 3,
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
-                if (reasonController.text.isNotEmpty) {
-                  // Add the rejection reason to the rejectedBooks collection with the specific user
+                if (reasonController.text.isEmpty) {
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(content: Text('Please provide a rejection reason.'))
+                  );
+                  return;
+                }
+
+                try {
+                  // Add to rejected books collection
                   await FirebaseFirestore.instance.collection('rejectedBooks').add({
-                    'userId': userId, // Rejecting only for this user
-                    'adminId': adminId, // The admin who rejected the book
-                    'bookId': book['bookId'], // Adding bookId to the rejectedBooks collection
+                    'userId': userId,
+                    'adminId': adminId,
+                    'bookId': book['bookId'],
                     'title': book['title'],
                     'writer': book['writer'],
                     'imageUrl': book['imageUrl'],
-                    'rejectionReason': reasonController.text,
-                    'rejectionDate': Timestamp.now(), // Store the current time as rejection date
+                    'rejectionReason': reasonController.text.trim(),
+                    'rejectionDate': Timestamp.now(),
                   });
 
-                  // Remove the book from this user's requests collection
                   await removeBookFromRequests(book, requests);
-
-                  Navigator.pop(context);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Book rejected and reason saved!')),
+                  Navigator.pop(dialogContext);
+                  
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(content: Text('Book rejected successfully!'))
                   );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please provide a rejection reason.')),
+                } catch (e) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(content: Text('Error: ${e.toString()}'))
                   );
                 }
               },

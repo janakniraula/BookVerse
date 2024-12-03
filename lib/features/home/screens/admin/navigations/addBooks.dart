@@ -240,10 +240,6 @@ class _AddBooksState extends State<AddBooks> {
     
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: TColors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: const Text(
           'Add Books',
           style: TextStyle(color: TColors.white),
@@ -251,6 +247,7 @@ class _AddBooksState extends State<AddBooks> {
         centerTitle: true,
         backgroundColor: TColors.primaryColor,
         foregroundColor: TColors.white,
+        automaticallyImplyLeading: false,
       ),
       body: Container(
         color: dark ? TColors.dark : TColors.light,

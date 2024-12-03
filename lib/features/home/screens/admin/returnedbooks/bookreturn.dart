@@ -4,67 +4,129 @@ import 'package:intl/intl.dart';
 
 class AcceptReturnedBooksScreen extends StatelessWidget {
   final String userId;
+  final _dateFormat = DateFormat('dd MMMM yyyy');
+  final _firestore = FirebaseFirestore.instance;
 
-  const AcceptReturnedBooksScreen({required this.userId, super.key});
+  AcceptReturnedBooksScreen({required this.userId, super.key});
 
-  // Function to handle accepting a book return and storing data in "DATA" collection
+  Widget _buildBookImage(String? imageUrl) {
+    return SizedBox(
+      width: 60,
+      height: 90,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: imageUrl?.isNotEmpty == true
+            ? Image.network(
+                imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+                loadingBuilder: (_, child, progress) =>
+                    progress == null ? child : const Center(child: CircularProgressIndicator()),
+              )
+            : const Icon(Icons.book),
+      ),
+    );
+  }
+
   Future<void> _acceptReturn(String docId, String bookId, Map<String, dynamic> bookData) async {
-    final toBeReturnedBooksCollection = FirebaseFirestore.instance.collection('toBeReturnedBooks');
-    final booksCollection = FirebaseFirestore.instance.collection('books');
-    final usersCollection = FirebaseFirestore.instance.collection('Users');
-    final dataCollection = FirebaseFirestore.instance.collection('DATA');
-
     try {
-      // Remove the book from 'toBeReturnedBooks'
-      await toBeReturnedBooksCollection.doc(docId).delete();
+      final batch = _firestore.batch();
+      
+      // Delete return request
+      batch.delete(_firestore.collection('toBeReturnedBooks').doc(docId));
 
-      // Increment the 'numberOfCopies' in the 'books' collection for the returned book
-      final bookDoc = booksCollection.doc(bookId);
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        final snapshot = await transaction.get(bookDoc);
-        if (snapshot.exists) {
-          final currentCopies = snapshot.get('numberOfCopies') as int;
-          transaction.update(bookDoc, {'numberOfCopies': currentCopies + 1});
-        }
+      // Get user data first
+      final userDoc = await _firestore.collection('Users').doc(userId).get();
+      if (!userDoc.exists) return;
+
+      // Prepare DATA document
+      final dataDoc = _firestore.collection('DATA').doc();
+      batch.set(dataDoc, {
+        'UserId': userId,
+        'UserName': userDoc.get('UserName'),
+        'Email': userDoc.get('Email'),
+        'PhoneNumber': userDoc.get('PhoneNumber'),
+        'Image': bookData['imageUrl'],
+        'BookName': bookData['title'],
+        'IssueDate': bookData['issueDate'],
+        'AcceptedDate': FieldValue.serverTimestamp(),
       });
 
-      // Get user details from 'Users' collection
-      final userDoc = await usersCollection.doc(userId).get();
-      if (userDoc.exists) {
-        final userData = userDoc.data() as Map<String, dynamic>;
+      await batch.commit();
 
-        // Prepare data for 'DATA' collection
-        final acceptedDate = DateTime.now();
-        await dataCollection.add({
-          'UserId': userId, // Insert userId here
-          'UserName': userData['UserName'],
-          'Email': userData['Email'],
-          'PhoneNumber': userData['PhoneNumber'],
-          'Image': bookData['imageUrl'],
-          'BookName': bookData['title'],
-          'IssueDate': bookData['issueDate'],
-          'AcceptedDate': acceptedDate,
-        });
-
-        print('Book return accepted and data stored successfully.');
-      } else {
-        print('User not found.');
-      }
+      // Update book copies in a separate transaction
+      await _firestore.runTransaction((transaction) async {
+        final bookDoc = await transaction.get(_firestore.collection('books').doc(bookId));
+        if (bookDoc.exists) {
+          final currentCopies = bookDoc.get('numberOfCopies') as int;
+          transaction.update(bookDoc.reference, {'numberOfCopies': currentCopies + 1});
+        }
+      });
     } catch (e) {
-      print("Error accepting return and updating copies: $e");
+      debugPrint('Error accepting return: $e');
     }
+  }
+
+  Widget _buildBookCard(BuildContext context, DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final issueDate = data["issueDate"] is Timestamp 
+        ? (data["issueDate"] as Timestamp).toDate()
+        : null;
+
+    return Card(
+      margin: const EdgeInsets.all(8),
+      child: ListTile(
+        leading: _buildBookImage(data["imageUrl"]),
+        title: Text(
+          data['title'] as String,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(data["writer"] as String),
+            if (issueDate != null)
+              Text('Issue Date: ${_dateFormat.format(issueDate)}'),
+          ],
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.check_circle, color: Colors.green),
+          onPressed: () => _showAcceptDialog(context, doc, data),
+        ),
+      ),
+    );
+  }
+
+  void _showAcceptDialog(BuildContext context, DocumentSnapshot doc, Map<String, dynamic> data) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Accept Book Return'),
+        content: const Text('Are you sure you want to accept this returned book?'),
+        actions: [
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context),
+          ),
+          TextButton(
+            child: const Text('Accept'),
+            onPressed: () {
+              _acceptReturn(doc.id, data['bookId'], data);
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final DateFormat dateFormat = DateFormat('dd MMMM yyyy');
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Books to be Returned'),
-      ),
+      appBar: AppBar(title: const Text('Books to be Returned')),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
+        stream: _firestore
             .collection('toBeReturnedBooks')
             .where('userId', isEqualTo: userId)
             .snapshots(),
@@ -79,109 +141,9 @@ class AcceptReturnedBooksScreen extends StatelessWidget {
             return const Center(child: Text('No books to accept for return.'));
           }
 
-          final books = snapshot.data!.docs;
-
           return ListView.builder(
-            itemCount: books.length,
-            itemBuilder: (context, index) {
-              final data = books[index].data() as Map<String, dynamic>;
-              final docId = books[index].id;
-              final bookId = data['bookId'] as String;
-
-              final issueDate = data["issueDate"] != null
-                  ? (data["issueDate"] as Timestamp).toDate()
-                  : null;
-              final requestedReturnDate = data["requestedReturnDate"] != null
-                  ? (data["requestedReturnDate"] as Timestamp).toDate()
-                  : null;
-              final returnDate = data["returnDate"] != null
-                  ? (data["returnDate"] as Timestamp).toDate()
-                  : null;
-
-              return Card(
-                margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Book cover image
-                      if (data["imageUrl"] != null)
-                        Image.network(
-                          data["imageUrl"] as String,
-                          width: 80,
-                          height: 120,
-                          fit: BoxFit.cover,
-                        )
-                      else
-                        const SizedBox(
-                          width: 80,
-                          height: 120,
-                          child: Placeholder(),
-                        ),
-                      const SizedBox(width: 10),
-                      // Book details
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              data['title'] as String,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text('Writer: ${data["writer"] as String}'),
-                            if (issueDate != null)
-                              Text('Issue Date: ${dateFormat.format(issueDate)}'),
-                            if (requestedReturnDate != null)
-                              Text('Requested Return Date: ${dateFormat.format(requestedReturnDate)}'),
-                            if (returnDate != null)
-                              Text(
-                                'Return Date: ${dateFormat.format(returnDate)}',
-                                style: const TextStyle(color: Colors.red),
-                              )
-                            else
-                              const Text(
-                                'Return Date: Not yet returned',
-                                style: TextStyle(color: Colors.grey),
-                              ),
-                          ],
-                        ),
-                      ),
-                      // Accept button
-                      IconButton(
-                        icon: const Icon(Icons.check_circle, color: Colors.green),
-                        onPressed: () {
-                          // Confirm return
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Accept Book Return'),
-                              content: const Text('Are you sure you want to accept this returned book?'),
-                              actions: [
-                                TextButton(
-                                  child: const Text('Cancel'),
-                                  onPressed: () => Navigator.of(context).pop(),
-                                ),
-                                TextButton(
-                                  child: const Text('OK'),
-                                  onPressed: () {
-                                    _acceptReturn(docId, bookId, data);
-                                    Navigator.of(context).pop();
-                                  },
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+            itemCount: snapshot.data!.docs.length,
+            itemBuilder: (context, index) => _buildBookCard(context, snapshot.data!.docs[index]),
           );
         },
       ),

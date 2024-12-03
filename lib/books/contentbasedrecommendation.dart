@@ -2,6 +2,7 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'dart:math';
 
 import '../common/widgets/texts/section_heading.dart';
 import 'detailScreen/course_book_detail_screen.dart';
@@ -114,7 +115,55 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
     }
   }
 
-  // New recommendation system based on user's search history
+  // Add new helper methods for cosine similarity
+  double _calculateCosineSimilarity(Map<String, double> vector1, Map<String, double> vector2) {
+    double dotProduct = 0.0;
+    double norm1 = 0.0;
+    double norm2 = 0.0;
+    
+    // Calculate dot product and norms
+    Set<String> allKeys = {...vector1.keys, ...vector2.keys};
+    for (String key in allKeys) {
+      double val1 = vector1[key] ?? 0.0;
+      double val2 = vector2[key] ?? 0.0;
+      dotProduct += val1 * val2;
+      norm1 += val1 * val1;
+      norm2 += val2 * val2;
+    }
+    
+    // Avoid division by zero
+    if (norm1 == 0 || norm2 == 0) return 0.0;
+    
+    return dotProduct / (sqrt(norm1) * sqrt(norm2));
+  }
+
+  Map<String, double> _createBookVector(Map<String, dynamic> book) {
+    Map<String, double> vector = {};
+    
+    // Extract and process features
+    String writer = (book['writer'] ?? '').toString().toLowerCase();
+    List<String> genres = (book['genre'] as List<dynamic>? ?? [])
+        .map((g) => g.toString().toLowerCase())
+        .toList();
+    String course = (book['course'] ?? '').toString().toLowerCase();
+    
+    // Add writer feature with higher weight
+    vector['writer_$writer'] = 3.0;
+    
+    // Add genre features
+    for (String genre in genres) {
+      vector['genre_$genre'] = 1.0;
+    }
+    
+    // Add course feature
+    if (course.isNotEmpty) {
+      vector['course_$course'] = 2.0;
+    }
+    
+    return vector;
+  }
+
+  // Update the recommendation system
   Future<List<Map<String, dynamic>>> _getRecommendedBooks(String userId) async {
     try {
       // Get user's recent searches
@@ -130,31 +179,45 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
         return [];
       }
 
-      // Extract authors from searched books
-      final searchedBooks = searchedBooksSnapshot.docs.map((doc) => doc.data());
-      final preferredAuthors = searchedBooks
-          .map((book) => book['writer']?.toString().trim())
-          .where((author) => author != null && author.isNotEmpty)
-          .toSet();
-
-      if (preferredAuthors.isEmpty) {
-        return [];
-      }
-
-      // Get recommendations based on preferred authors
-      final recommendationsQuery = await _firestore
+      // Get all books for comparison
+      final allBooksSnapshot = await _firestore
           .collection('books')
-          .where('writer', whereIn: preferredAuthors.take(10).toList())
-          .limit(10)
+          .limit(100) // Limit for performance
           .get();
 
-      final Set<Map<String, dynamic>> recommendations = {};
-
-      for (var doc in recommendationsQuery.docs) {
-        recommendations.add(_processBookData(doc.data(), doc.id));
+      // Create user profile vector based on search history
+      Map<String, double> userProfile = {};
+      final searchedBooks = searchedBooksSnapshot.docs;
+      
+      for (var doc in searchedBooks) {
+        final bookVector = _createBookVector(doc.data());
+        // Combine vectors with decay factor based on search order
+        double decayFactor = 1.0;
+        bookVector.forEach((key, value) {
+          userProfile[key] = (userProfile[key] ?? 0.0) + value * decayFactor;
+          decayFactor *= 0.8; // Decay factor for older searches
+        });
       }
 
-      return recommendations.toList();
+      // Calculate similarity scores for all books
+      List<MapEntry<double, Map<String, dynamic>>> scoredBooks = [];
+      
+      for (var doc in allBooksSnapshot.docs) {
+        final bookData = doc.data();
+        final bookVector = _createBookVector(bookData);
+        final similarity = _calculateCosineSimilarity(userProfile, bookVector);
+        
+        if (similarity > 0) { // Only include books with some similarity
+          scoredBooks.add(MapEntry(
+            similarity,
+            _processBookData(bookData, doc.id),
+          ));
+        }
+      }
+
+      // Sort by similarity score and take top results
+      scoredBooks.sort((a, b) => b.key.compareTo(a.key));
+      return scoredBooks.take(10).map((e) => e.value).toList();
     } catch (e) {
       print('Error getting recommendations: $e');
       return [];
@@ -306,15 +369,15 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
                             borderRadius: BorderRadius.circular(20),
                             child: imageUrl.isNotEmpty
                                 ? Image.network(
-                              imageUrl,
-                              width: 150,
-                              height: 220,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                print('Image Error: $error');
-                                return _buildPlaceholder();
-                              },
-                            )
+                                    imageUrl,
+                                    width: 150,
+                                    height: 220,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      print('Image Error: $error');
+                                      return _buildPlaceholder();
+                                    },
+                                  )
                                 : _buildPlaceholder(),
                           ),
                         ),

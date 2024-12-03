@@ -12,7 +12,7 @@ class IssuedBooksScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Theme.of(context).colorScheme.background,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text(
           'Issued Books',
           style: TextStyle(

@@ -1,7 +1,6 @@
 import 'package:book_Verse/features/authentication/screens/signup/upWidget/signup_form.dart';
 import 'package:book_Verse/utils/constants/text_strings.dart';
 import 'package:flutter/material.dart';
-import '../../../../common/widgets/login_signup/social_buttons.dart';
 import '../../../../utils/constants/sizes.dart';
 
 class SignUpScreen extends StatelessWidget {

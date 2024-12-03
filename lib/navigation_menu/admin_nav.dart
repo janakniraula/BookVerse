@@ -84,13 +84,5 @@ class AdminNavigationController extends GetxController {
     selectedIndex.value = index;
   }
 
-  @override
-  void onInit() {
-    super.onInit();
-  }
 
-  @override
-  void onClose() {
-    super.onClose();
-  }
 }

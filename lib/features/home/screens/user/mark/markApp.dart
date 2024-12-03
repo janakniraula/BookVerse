@@ -64,10 +64,13 @@ class BookmarkScreen extends StatelessWidget {
                         children: [
                           Text(
                             filteredBookmarks.length.toString(),
-                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
                           ),
                           const Text(
                             'Total Books',
@@ -83,7 +86,6 @@ class BookmarkScreen extends StatelessWidget {
               ),
             ),
           ),
-
           if (bookCounts.isEmpty)
             SliverToBoxAdapter(
               child: Center(
@@ -114,9 +116,9 @@ class BookmarkScreen extends StatelessWidget {
                 child: Text(
                   'Your Bookmarks',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                 ),
               ),
             ),
@@ -124,11 +126,11 @@ class BookmarkScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
-                      (context, index) {
+                  (context, index) {
                     final title = bookCounts.keys.elementAt(index);
                     final count = bookCounts[title]!;
                     final book = filteredBookmarks.firstWhere(
-                          (b) => b['title'] == title,
+                      (b) => b['title'] == title,
                       orElse: () => {
                         'title': '',
                         'writer': '',
@@ -171,7 +173,8 @@ class BookmarkScreen extends StatelessWidget {
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
-                                        Icon(Icons.copy, size: 16, color: Colors.grey[600]),
+                                        Icon(Icons.copy,
+                                            size: 16, color: Colors.grey[600]),
                                         const SizedBox(width: 4),
                                         Text(
                                           '$count copies',
@@ -201,7 +204,6 @@ class BookmarkScreen extends StatelessWidget {
               ),
             ),
           ],
-
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -211,9 +213,9 @@ class BookmarkScreen extends StatelessWidget {
                   Text(
                     'Requested Books',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
@@ -260,14 +262,14 @@ class BookmarkScreen extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: (book['imageUrl'] ?? '').isNotEmpty
           ? Image.network(
-        book['imageUrl']!,
-        width: 80,
-        height: 80,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return _buildPlaceholderImage();
-        },
-      )
+              book['imageUrl']!,
+              width: 80,
+              height: 80,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return _buildPlaceholderImage();
+              },
+            )
           : _buildPlaceholderImage(),
     );
   }
@@ -300,7 +302,8 @@ class BookmarkScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _removeBookmark(BuildContext context, Map<String, dynamic> book) async {
+  Future<void> _removeBookmark(
+      BuildContext context, Map<String, dynamic> book) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -311,8 +314,12 @@ class BookmarkScreen extends StatelessWidget {
 
     final docId = book['id'];
     try {
-      await FirebaseFirestore.instance.collection('bookmarks').doc(docId).delete();
-      Provider.of<BookmarkProvider>(context, listen: false).removeBookmark(book);
+      await FirebaseFirestore.instance
+          .collection('bookmarks')
+          .doc(docId)
+          .delete();
+      Provider.of<BookmarkProvider>(context, listen: false)
+          .removeBookmark(book);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${book['title']} removed from bookmarks')),
       );
@@ -332,7 +339,8 @@ class BookmarkScreen extends StatelessWidget {
       return;
     }
 
-    final bookmarks = Provider.of<BookmarkProvider>(context, listen: false).bookmarks;
+    final bookmarks =
+        Provider.of<BookmarkProvider>(context, listen: false).bookmarks;
     final uniqueBookmarks = <Map<String, dynamic>>[];
     final seenTitles = <String>{};
 
@@ -361,8 +369,8 @@ class BookmarkScreen extends StatelessWidget {
         .where('userId', isEqualTo: user.uid)
         .get();
     final existingRequests = existingRequestsSnapshot.docs
-        .expand((doc) => (doc.data()['books'] as List)
-        .map((book) => book['title'] ?? ''))
+        .expand((doc) =>
+            (doc.data()['books'] as List).map((book) => book['title'] ?? ''))
         .toSet();
 
     final alreadyRequestedBooks = nonIssuedBooks
@@ -418,7 +426,8 @@ class BookmarkScreen extends StatelessWidget {
                     'requestedAt': FieldValue.serverTimestamp(),
                   });
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Books added to your requests')),
+                    const SnackBar(
+                        content: Text('Books added to your requests')),
                   );
                 } catch (error) {
                   ScaffoldMessenger.of(context).showSnackBar(

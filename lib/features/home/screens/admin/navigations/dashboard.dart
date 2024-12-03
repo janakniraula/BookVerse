@@ -84,7 +84,7 @@ class _DashboardState extends State<Dashboard> {
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 children: [
-                  Text(
+                  const Text(
                     'Error loading data',
                     style: TextStyle(color: TColors.error),
                   ),
@@ -181,7 +181,7 @@ class _DashboardState extends State<Dashboard> {
                 ],
               ),
             ),
-            Icon(
+            const Icon(
               Icons.arrow_forward_ios,
               color: Colors.grey,
               size: 20,
@@ -233,9 +233,9 @@ class _DashboardState extends State<Dashboard> {
               collapsedBackgroundColor: Colors.transparent,
               title: Row(
                 children: [
-                  Text(
+                  const Text(
                     'Recent Notifications',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,

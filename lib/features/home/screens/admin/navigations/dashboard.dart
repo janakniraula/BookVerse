@@ -42,25 +42,28 @@ class _DashboardState extends State<Dashboard> {
     final isDark = THelperFunction.isDarkMode(context);
     
     return Scaffold(
-      backgroundColor: isDark ? TColors.black : TColors.white,
+      backgroundColor: isDark ? Colors.black : TColors.white,
       body: RefreshIndicator(
         color: TColors.primaryColor,
         onRefresh: () async => setState(() => _loadData()),
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            children: [
-              const TPrimaryHeaderContainer(
-                child: Column(
-                  children: [
-                    SizedBox(height: TSizes.sm),
-                    TAdminAppBar(),
-                    SizedBox(height: TSizes.spaceBtwSections),
-                  ],
+        child: Container(
+          color: isDark ? Colors.black : TColors.white,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              children: [
+                const TPrimaryHeaderContainer(
+                  child: Column(
+                    children: [
+                      SizedBox(height: TSizes.sm),
+                      TAdminAppBar(),
+                      SizedBox(height: TSizes.spaceBtwSections),
+                    ],
+                  ),
                 ),
-              ),
-              _buildDashboardContent(isDark),
-            ],
+                _buildDashboardContent(isDark),
+              ],
+            ),
           ),
         ),
       ),
@@ -107,7 +110,7 @@ class _DashboardState extends State<Dashboard> {
         final [books, users, issuedBooks, returnedBooks, notifications] = snapshot.data!;
 
         return Container(
-          color: isDark ? TColors.black : TColors.white,
+          color: isDark ? Colors.black : TColors.white,
           padding: const EdgeInsets.all(TSizes.defaultSpace),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -131,7 +134,7 @@ class _DashboardState extends State<Dashboard> {
         margin: const EdgeInsets.only(bottom: TSizes.spaceBtwItems),
         padding: const EdgeInsets.all(TSizes.md),
         decoration: BoxDecoration(
-          color: isDark ? TColors.black : TColors.white,
+          color: isDark ? Colors.black : TColors.white,
           borderRadius: BorderRadius.circular(TSizes.cardRadiusLg),
           border: Border.all(color: isDark ? TColors.darkGrey : TColors.grey),
         ),
@@ -182,7 +185,7 @@ class _DashboardState extends State<Dashboard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: isDark ? TColors.black : TColors.white,
+        color: isDark ? Colors.black : TColors.white,
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: isDark ? TColors.darkGrey : TColors.grey),
       ),
@@ -204,6 +207,15 @@ class _DashboardState extends State<Dashboard> {
 
             final notifications = snapshot.data!.docs;
             return ExpansionTile(
+              maintainState: true,
+              initiallyExpanded: false,
+              expandedCrossAxisAlignment: CrossAxisAlignment.start,
+              childrenPadding: EdgeInsets.zero,
+              tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              backgroundColor: Colors.transparent,
+              collapsedBackgroundColor: Colors.transparent,
               leading: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -212,17 +224,12 @@ class _DashboardState extends State<Dashboard> {
                 ),
                 child: Icon(Icons.notifications, color: TColors.primaryColor, size: 20),
               ),
-              tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              backgroundColor: Colors.transparent,
-              collapsedBackgroundColor: Colors.transparent,
               title: Row(
                 children: [
-                  const Text(
+                  Text(
                     'Recent Notifications',
                     style: TextStyle(
-                      color: TColors.black,
+                      color: isDark ? TColors.white : TColors.black,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
@@ -246,40 +253,35 @@ class _DashboardState extends State<Dashboard> {
                 ],
               ),
               children: [
-                Container(
-                  color: isDark ? TColors.black : TColors.white,
-                  constraints: BoxConstraints(
-                    maxHeight: notifications.length > 3 ? 200 : notifications.length * 72.0,
-                    minHeight: 0,
-                  ),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: notifications.length,
-                    itemBuilder: (context, index) {
-                      final data = notifications[index].data() as Map<String, dynamic>;
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        title: Text(
-                          data['message'] ?? 'No message',
-                          style: const TextStyle(
-                            color: TColors.black,
-                            fontSize: 14,
-                          ),
+                ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: notifications.length,
+                  itemBuilder: (context, index) {
+                    final data = notifications[index].data() as Map<String, dynamic>;
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      title: Text(
+                        data['message'] ?? 'No message',
+                        style: TextStyle(
+                          color: isDark ? TColors.white : TColors.black,
+                          fontSize: 14,
                         ),
-                        subtitle: Text(
-                          _formatDate(data['timestamp'] as Timestamp),
-                          style: const TextStyle(
-                            color: TColors.grey,
-                            fontSize: 12,
-                          ),
+                      ),
+                      subtitle: Text(
+                        _formatDate(data['timestamp'] as Timestamp),
+                        style: TextStyle(
+                          color: isDark ? TColors.grey : TColors.darkGrey,
+                          fontSize: 12,
                         ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: TColors.error, size: 20),
-                          onPressed: () => _deleteNotification(notifications[index].id),
-                        ),
-                      );
-                    },
-                  ),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete, color: TColors.error, size: 20),
+                        onPressed: () => _deleteNotification(notifications[index].id),
+                      ),
+                    );
+                  },
                 ),
               ],
             );
@@ -290,12 +292,140 @@ class _DashboardState extends State<Dashboard> {
   }
 
   Widget _buildIssuedBooksSection(List<QueryDocumentSnapshot> issuedBooks, bool isDark) {
-    return _buildExpandableSection(
-      'Issued Books',
-      Icons.book_online,
-      issuedBooks,
-          (userId) => IssuedBooksScreen(userId: userId),
-      isDark,
+    // Group books by userId
+    final Map<String, List<QueryDocumentSnapshot>> booksByUser = {};
+    for (var doc in issuedBooks) {
+      final data = doc.data() as Map<String, dynamic>;
+      final userId = data['userId'] ?? 'Unknown';
+      if (!booksByUser.containsKey(userId)) {
+        booksByUser[userId] = [];
+      }
+      booksByUser[userId]!.add(doc);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.black : TColors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: isDark ? TColors.darkGrey : TColors.grey),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+        ),
+        child: ExpansionTile(
+          maintainState: true,
+          initiallyExpanded: false,
+          expandedCrossAxisAlignment: CrossAxisAlignment.start,
+          childrenPadding: EdgeInsets.zero,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          backgroundColor: Colors.transparent,
+          collapsedBackgroundColor: Colors.transparent,
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: TColors.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.book_online, color: TColors.primaryColor, size: 20),
+          ),
+          title: Row(
+            children: [
+              Text(
+                'Issued Books',
+                style: TextStyle(
+                  color: isDark ? TColors.white : TColors.black,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: TColors.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  issuedBooks.length.toString(),
+                  style: const TextStyle(
+                    color: TColors.primaryColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          children: [
+            ListView.builder(
+              padding: EdgeInsets.zero,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: booksByUser.length,
+              itemBuilder: (context, index) {
+                final userId = booksByUser.keys.elementAt(index);
+                final userBooks = booksByUser[userId]!;
+                
+                return FutureBuilder<DocumentSnapshot>(
+                  future: _firestore.collection('Users').doc(userId).get(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const SizedBox();
+                    final userData = snapshot.data!.data() as Map<String, dynamic>?;
+                    
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      title: Text(
+                        userData?['UserName'] ?? 'Unknown User',
+                        style: TextStyle(
+                          color: isDark ? TColors.white : TColors.black,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            userData?['Email'] ?? 'No email',
+                            style: TextStyle(
+                              color: isDark ? TColors.grey : TColors.darkGrey,
+                              fontSize: 12,
+                            ),
+                          ),
+                          Text(
+                            '${userBooks.length} books issued',
+                            style: TextStyle(
+                              color: isDark ? TColors.grey : TColors.darkGrey,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      trailing: const Icon(Icons.arrow_forward_ios, 
+                        color: TColors.grey, 
+                        size: 18
+                      ),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => IssuedBooksScreen(userId: userId)
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -319,7 +449,7 @@ class _DashboardState extends State<Dashboard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: isDark ? TColors.black : TColors.white,
+        color: isDark ? Colors.black : TColors.white,
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: isDark ? TColors.darkGrey : TColors.grey),
       ),
@@ -330,6 +460,15 @@ class _DashboardState extends State<Dashboard> {
           highlightColor: Colors.transparent,
         ),
         child: ExpansionTile(
+          maintainState: true,
+          initiallyExpanded: false,
+          expandedCrossAxisAlignment: CrossAxisAlignment.start,
+          childrenPadding: EdgeInsets.zero,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          backgroundColor: Colors.transparent,
+          collapsedBackgroundColor: Colors.transparent,
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
@@ -338,17 +477,12 @@ class _DashboardState extends State<Dashboard> {
             ),
             child: Icon(icon, color: TColors.primaryColor, size: 20),
           ),
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          backgroundColor: Colors.transparent,
-          collapsedBackgroundColor: Colors.transparent,
           title: Row(
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  color: TColors.black,
+                style: TextStyle(
+                  color: isDark ? TColors.white : TColors.black,
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
@@ -372,49 +506,45 @@ class _DashboardState extends State<Dashboard> {
             ],
           ),
           children: [
-            Container(
-              color: isDark ? TColors.black : TColors.white,
-              constraints: BoxConstraints(
-                maxHeight: docs.length > 3 ? 200 : docs.length * 72.0,
-                minHeight: 0,
-              ),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: docs.length,
-                itemBuilder: (context, index) {
-                  final data = docs[index].data() as Map<String, dynamic>;
-                  final userId = data['userId'] ?? 'Unknown';
-                  return FutureBuilder<DocumentSnapshot>(
-                    future: _firestore.collection('Users').doc(userId).get(),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) return const SizedBox();
-                      final userData = snapshot.data!.data() as Map<String, dynamic>?;
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        title: Text(
-                          userData?['UserName'] ?? 'Unknown User',
-                          style: const TextStyle(
-                            color: TColors.black,
-                            fontSize: 14,
-                          ),
+            ListView.builder(
+              padding: EdgeInsets.zero,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: docs.length,
+              itemBuilder: (context, index) {
+                final data = docs[index].data() as Map<String, dynamic>;
+                final userId = data['userId'] ?? 'Unknown';
+                return FutureBuilder<DocumentSnapshot>(
+                  future: _firestore.collection('Users').doc(userId).get(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const SizedBox();
+                    final userData = snapshot.data!.data() as Map<String, dynamic>?;
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      title: Text(
+                        userData?['UserName'] ?? 'Unknown User',
+                        style: TextStyle(
+                          color: isDark ? TColors.white : TColors.black,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
                         ),
-                        subtitle: Text(
-                          userData?['Email'] ?? 'No email',
-                          style: const TextStyle(
-                            color: TColors.grey,
-                            fontSize: 12,
-                          ),
+                      ),
+                      subtitle: Text(
+                        userData?['Email'] ?? 'No email',
+                        style: TextStyle(
+                          color: isDark ? TColors.grey : TColors.darkGrey,
+                          fontSize: 12,
                         ),
-                        trailing: const Icon(Icons.arrow_forward_ios, color: TColors.grey, size: 18),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => destinationBuilder(userId)),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+                      ),
+                      trailing: const Icon(Icons.arrow_forward_ios, color: TColors.grey, size: 18),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => destinationBuilder(userId)),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           ],
         ),

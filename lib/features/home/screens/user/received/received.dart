@@ -83,7 +83,7 @@ class Received extends StatelessWidget {
             return Center(
               child: Text(
                 'Error: ${snapshot.error}',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                   color: TColors.error,
                 ),
@@ -127,7 +127,7 @@ class Received extends StatelessWidget {
             return Center(
               child: Text(
                 'Error: ${snapshot.error}',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 16,
                   color: TColors.error,
                 ),

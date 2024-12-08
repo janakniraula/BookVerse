@@ -9,12 +9,14 @@ class AllBooksScreen extends StatelessWidget {
     final QuerySnapshot snapshot = await FirebaseFirestore.instance.collection('books').get();
 
     final List<Map<String, dynamic>> books = snapshot.docs.map((doc) {
+      final Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
       return {
-        'title': doc['title'] as String? ?? 'Unknown Title',
-        'writer': doc['writer'] as String? ?? 'Unknown Writer',
-        'imageUrl': doc['imageUrl'] as String? ?? '',
-        'course': doc['course'] as String? ?? 'Unknown Course',
-        'summary': doc['summary'] as String? ?? 'No Summary Available',
+        'title': data['title'] as String? ?? 'Unknown Title',
+        'writer': data['writer'] as String? ?? 'Unknown Writer',
+        'imageUrl': data['imageUrl'] as String? ?? '',
+        'course': data['course'] as String? ?? '',
+        'summary': data['summary'] as String? ?? 'No Summary Available',
+        'genre': (data['genre'] as List<dynamic>?)?.map((g) => g.toString()).toList() ?? [],
       };
     }).toList();
 
@@ -108,6 +110,7 @@ class AllBooksScreen extends StatelessWidget {
                                   imageUrl: book['imageUrl'],
                                   course: book['course'],
                                   summary: book['summary'],
+                                  genre: book['genre'] as List<dynamic>,
                                 ),
                               ),
                             );

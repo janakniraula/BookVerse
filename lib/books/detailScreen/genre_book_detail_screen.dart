@@ -113,7 +113,7 @@ class GenreBookDetailScreen extends StatelessWidget {
             fit: BoxFit.cover,
             loadingBuilder: (context, child, loadingProgress) {
               if (loadingProgress == null) return child;
-              return Center(child: CircularProgressIndicator());
+              return const Center(child: CircularProgressIndicator());
             },
             errorBuilder: (_, __, ___) => _buildPlaceholder(),
           )

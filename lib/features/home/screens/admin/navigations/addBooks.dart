@@ -415,7 +415,7 @@ class _AddBooksState extends State<AddBooks> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: TColors.primaryColor),
+              borderSide: const BorderSide(color: TColors.primaryColor),
             ),
           ),
           validator: validator ?? (value) {
@@ -567,7 +567,7 @@ class _AddBooksState extends State<AddBooks> {
           ),
         ),
         trailing: IconButton(
-          icon: Icon(Icons.close, color: TColors.error),
+          icon: const Icon(Icons.close, color: TColors.error),
           onPressed: () => setState(() => _pdfs.remove(pdf)),
         ),
       ),

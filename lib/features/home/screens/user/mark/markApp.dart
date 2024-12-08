@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:book_Verse/features/home/screens/user/mark/provider.dart';
 import 'package:book_Verse/features/home/screens/user/mark/requestssss.dart';
-import '../../../../../books/detailScreen/course_book_detail_screen.dart';
 import '../../../../../utils/constants/colors.dart';
 import '../../../../../utils/helpers/helper_function.dart';
 
@@ -20,8 +19,21 @@ class MarkApp extends StatelessWidget {
   }
 }
 
-class BookmarkScreen extends StatelessWidget {
+class BookmarkScreen extends StatefulWidget {
   const BookmarkScreen({super.key});
+
+  @override
+  State<BookmarkScreen> createState() => _BookmarkScreenState();
+}
+
+class _BookmarkScreenState extends State<BookmarkScreen> {
+  late BookmarkProvider bookmarkProvider;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    bookmarkProvider = Provider.of<BookmarkProvider>(context, listen: false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -134,59 +146,55 @@ class BookmarkScreen extends StatelessWidget {
                       elevation: 2,
                       color: dark ? TColors.darkContainer : TColors.lightContainer,
                       margin: const EdgeInsets.only(bottom: 12),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () => _navigateToDetail(context, book),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              _buildBookImage(book, context),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      title,
-                                      style: Theme.of(context).textTheme.titleMedium,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      book['writer'] ?? '',
-                                      style: Theme.of(context).textTheme.bodyMedium,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.copy, 
-                                          size: 16, 
-                                          color: dark ? TColors.darkGrey : TColors.grey
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '$count copies',
-                                          style: Theme.of(context).textTheme.labelMedium,
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            _buildBookImage(book, context),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    title,
+                                    style: Theme.of(context).textTheme.titleMedium,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    book['writer'] ?? '',
+                                    style: Theme.of(context).textTheme.bodyMedium,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.copy, 
+                                        size: 16, 
+                                        color: dark ? TColors.darkGrey : TColors.grey
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '$count copies',
+                                        style: Theme.of(context).textTheme.labelMedium,
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                color: TColors.error,
-                                onPressed: () => _removeBookmark(context, book),
-                              ),
-                            ],
-                          ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              color: TColors.error,
+                              onPressed: () => _removeBookmark(context, book),
+                            ),
+                          ],
                         ),
                       ),
                     );
@@ -269,38 +277,33 @@ class BookmarkScreen extends StatelessWidget {
     );
   }
 
-  void _navigateToDetail(BuildContext context, Map<String, dynamic> book) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CourseBookDetailScreen(
-          title: book['title'] ?? '',
-          writer: book['writer'] ?? '',
-          imageUrl: book['imageUrl'] ?? '',
-          course: book['course'] ?? '',
-          summary: book['summary'] ?? '',
-        ),
-      ),
-    );
-  }
-
   Future<void> _removeBookmark(BuildContext context, Map<String, dynamic> book) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('User not logged in')),
       );
       return;
     }
 
-    final docId = book['id'];
     try {
-      await FirebaseFirestore.instance.collection('bookmarks').doc(docId).delete();
-      Provider.of<BookmarkProvider>(context, listen: false).removeBookmark(book);
+      final snapshot = await FirebaseFirestore.instance
+          .collection('bookmarks')
+          .where('userId', isEqualTo: user.uid)
+          .where('title', isEqualTo: book['title'])
+          .get();
+
+      for (var doc in snapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${book['title']} removed from bookmarks')),
+        const SnackBar(content: Text('Book removed from bookmarks')),
       );
     } catch (error) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to remove bookmark: $error')),
       );
@@ -310,13 +313,14 @@ class BookmarkScreen extends StatelessWidget {
   Future<void> _saveBookmarksToRequests(BuildContext context) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('User not logged in')),
       );
       return;
     }
 
-    final bookmarks = Provider.of<BookmarkProvider>(context, listen: false).bookmarks;
+    final bookmarks = bookmarkProvider.bookmarks;
     final uniqueBookmarks = <Map<String, dynamic>>[];
     final seenTitles = <String>{};
 

@@ -25,7 +25,7 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
     _fetchRecommendations();
   }
 
-  // Process book data for display
+  // Standardizes book data format for consistency
   Map<String, dynamic> _processBookData(Map<String, dynamic> data, String id) {
     return {
       'id': id,
@@ -39,13 +39,15 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
   }
 
   void _updateState(List<Map<String, dynamic>> books, bool loading) {
-    setState(() {
-      _recommendedBooks = books;
-      _isLoading = loading;
-    });
+    if (mounted) {
+      setState(() {
+        _recommendedBooks = books;
+        _isLoading = loading;
+      });
+    }
   }
 
-  // Get fallback recommendations
+  // Fetches recent books as fallback recommendations
   Future<List<Map<String, dynamic>>> _getFallbackBooks() async {
     try {
       final snapshot = await _firestore
@@ -63,72 +65,76 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
     }
   }
 
-  // Calculate similarity between user profile and book
-  double _calculateSimilarity(
-      Map<String, double> profile, Map<String, dynamic> book) {
-    double similarity = 0.0;
+  // Calculates cosine similarity between user profile and book features
+  double _calculateSimilarity(Map<String, double> profile, Map<String, dynamic> book) {
+    final features = {
+      'writer': {'weight': 4.0, 'value': book['writer']?.toString().toLowerCase() ?? ''},
+      'genre': {'weight': 2.5, 'values': (book['genre'] as List<dynamic>?)?.map((g) => g.toString().toLowerCase()).toList() ?? []},
+      'course': {'weight': 2.0, 'value': book['course']?.toString().toLowerCase() ?? ''}
+    };
+
+    double dotProduct = 0.0;
     double profileNorm = 0.0;
     double bookNorm = 0.0;
 
     // Calculate writer similarity
-    final writer = book['writer']?.toString().toLowerCase() ?? '';
-    final writerKey = 'writer_$writer';
-    final writerValue = 4.0;
-    similarity += (profile[writerKey] ?? 0.0) * writerValue;
-    profileNorm += (profile[writerKey] ?? 0.0) * (profile[writerKey] ?? 0.0);
-    bookNorm += writerValue * writerValue;
+    final writerKey = 'writer_${features['writer']!['value']}';
+    const writerWeight = 4.0;
+    dotProduct += (profile[writerKey] ?? 0.0) * writerWeight;
+    profileNorm += pow(profile[writerKey] ?? 0.0, 2);
+    bookNorm += pow(writerWeight, 2);
 
     // Calculate genre similarity
-    final genres = (book['genre'] as List<dynamic>? ?? [])
-        .map((g) => g.toString().toLowerCase());
-    for (var genre in genres) {
+    for (var genre in features['genre']!['values'] as List<String>) {
       final genreKey = 'genre_$genre';
-      final genreValue = 2.5;
-      similarity += (profile[genreKey] ?? 0.0) * genreValue;
-      profileNorm += (profile[genreKey] ?? 0.0) * (profile[genreKey] ?? 0.0);
-      bookNorm += genreValue * genreValue;
+      const genreWeight = 2.5;
+      dotProduct += (profile[genreKey] ?? 0.0) * genreWeight;
+      profileNorm += pow(profile[genreKey] ?? 0.0, 2);
+      bookNorm += pow(genreWeight, 2);
     }
 
     // Calculate course similarity
-    final course = book['course']?.toString().toLowerCase() ?? '';
-    if (course.isNotEmpty) {
-      final courseKey = 'course_$course';
-      final courseValue = 2.0;
-      similarity += (profile[courseKey] ?? 0.0) * courseValue;
-      profileNorm += (profile[courseKey] ?? 0.0) * (profile[courseKey] ?? 0.0);
-      bookNorm += courseValue * courseValue;
+    if ((features['course']!['value'] as String).isNotEmpty) {
+      final courseKey = 'course_${features['course']!['value']}';
+      const courseWeight = 2.0;
+      dotProduct += (profile[courseKey] ?? 0.0) * courseWeight;
+      profileNorm += pow(profile[courseKey] ?? 0.0, 2);
+      bookNorm += pow(courseWeight, 2);
     }
 
-    // Avoid division by zero
-    if (profileNorm == 0 || bookNorm == 0) return 0.0;
-
-    return similarity / (sqrt(profileNorm) * sqrt(bookNorm));
+    return (profileNorm > 0 && bookNorm > 0) 
+        ? dotProduct / (sqrt(profileNorm) * sqrt(bookNorm))
+        : 0.0;
   }
 
-  // Add book features to profile with weight
-  void _addToProfile(Map<String, double> profile, Map<String, dynamic> bookData,
-      double weight) {
-    final writer = bookData['writer']?.toString().toLowerCase() ?? '';
-    final genres = (bookData['genre'] as List<dynamic>? ?? [])
-        .map((g) => g.toString().toLowerCase());
-    final course = bookData['course']?.toString().toLowerCase() ?? '';
+  // Updates user profile with weighted book features
+  void _addToProfile(Map<String, double> profile, Map<String, dynamic> bookData, double weight) {
+    final features = {
+      'writer': {'weight': 4.0, 'value': bookData['writer']?.toString().toLowerCase() ?? ''},
+      'genre': {'weight': 2.5, 'values': (bookData['genre'] as List<dynamic>?)?.map((g) => g.toString().toLowerCase()).toList() ?? []},
+      'course': {'weight': 2.0, 'value': bookData['course']?.toString().toLowerCase() ?? ''}
+    };
 
-    // Add weighted features
-    if (writer.isNotEmpty)
-      profile['writer_$writer'] =
-          (profile['writer_$writer'] ?? 0.0) + 4.0 * weight;
-    for (var genre in genres) {
-      profile['genre_$genre'] = (profile['genre_$genre'] ?? 0.0) + 2.5 * weight;
+    final String writerValue = features['writer']!['value'] as String;
+    if (writerValue.isNotEmpty) {
+      final key = 'writer_$writerValue';
+      profile[key] = (profile[key] ?? 0.0) + 4.0 * weight;
     }
-    if (course.isNotEmpty) {
-      profile['course_$course'] =
-          (profile['course_$course'] ?? 0.0) + 2.0 * weight;
+
+    for (var genre in features['genre']!['values'] as List<String>) {
+      final key = 'genre_$genre';
+      profile[key] = (profile[key] ?? 0.0) + 2.5 * weight;
+    }
+
+    final String courseValue = features['course']!['value'] as String;
+    if (courseValue.isNotEmpty) {
+      final key = 'course_$courseValue';
+      profile[key] = (profile[key] ?? 0.0) + 2.0 * weight;
     }
   }
 
-  // Get recommended books based on user profile
-  Future<List<Map<String, dynamic>>> _getRecommendedBooks(
-      Map<String, double> userProfile) async {
+  // Generates recommendations using cosine similarity and diversity factors
+  Future<List<Map<String, dynamic>>> _getRecommendedBooks(Map<String, double> userProfile) async {
     final allBooks = await _firestore.collection('books').limit(200).get();
     final scoredBooks = <MapEntry<double, Map<String, dynamic>>>[];
     final selectedAuthors = <String>{};
@@ -153,12 +159,11 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
     return scoredBooks.take(10).map((e) => e.value).toList();
   }
 
-  // Create user profile from search history and bookmarks
+  // Creates user profile from search history and bookmarks with time decay
   Future<Map<String, double>> _createUserProfile(String userId) async {
     Map<String, double> profile = {};
     final now = DateTime.now();
 
-    // Get search history
     final searches = await _firestore
         .collection('searchedBooks')
         .where('userId', isEqualTo: userId)
@@ -166,30 +171,24 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
         .limit(10)
         .get();
 
-    // Get bookmarks
     final bookmarks = await _firestore
         .collection('bookmarks')
         .where('userId', isEqualTo: userId)
         .get();
 
-    // Process search history with time decay
     for (var doc in searches.docs) {
       final bookData = doc.data();
       final searchedAt = (bookData['searchedAt'] as Timestamp).toDate();
-      final daysDifference = now.difference(searchedAt).inDays;
-      final timeDecay = exp(-0.1 * daysDifference);
-
+      final timeDecay = exp(-0.1 * now.difference(searchedAt).inDays);
       _addToProfile(profile, bookData, timeDecay);
     }
 
-    // Process bookmarks with higher weight
     for (var doc in bookmarks.docs) {
       final bookId = doc.data()['bookId'] as String?;
       if (bookId != null) {
         final bookDoc = await _firestore.collection('books').doc(bookId).get();
         if (bookDoc.exists) {
-          _addToProfile(
-              profile, bookDoc.data()!, 1.5); // Bookmarks get 1.5x weight
+          _addToProfile(profile, bookDoc.data()!, 1.5);
         }
       }
     }
@@ -197,7 +196,6 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
     return profile;
   }
 
-  // Main recommendation function
   Future<void> _fetchRecommendations() async {
     try {
       setState(() => _isLoading = true);
@@ -208,12 +206,8 @@ class _ContentBasedAlgorithmState extends State<ContentBasedAlgorithm> {
         return _updateState(await _getFallbackBooks(), false);
       }
 
-      // Get user profile data
       final userProfile = await _createUserProfile(userId);
-
-      // Get recommendations based on profile
       final recommendations = await _getRecommendedBooks(userProfile);
-
       _updateState(recommendations, false);
     } catch (e) {
       print('Error in recommendations: $e');

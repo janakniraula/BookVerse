@@ -59,7 +59,7 @@ class AdminNavigationMenu extends StatelessWidget {
         return Scaffold(
           bottomNavigationBar: Obx(() => NavigationBarTheme(
             data: NavigationBarThemeData(
-              labelTextStyle: MaterialStateProperty.all(
+              labelTextStyle: WidgetStateProperty.all(
                 TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,

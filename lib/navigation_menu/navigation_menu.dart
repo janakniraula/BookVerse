@@ -33,7 +33,7 @@ class NavigationMenu extends StatelessWidget {
         return Scaffold(
           bottomNavigationBar: NavigationBarTheme(
             data: NavigationBarThemeData(
-              labelTextStyle: MaterialStateProperty.all(
+              labelTextStyle: WidgetStateProperty.all(
                 TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,

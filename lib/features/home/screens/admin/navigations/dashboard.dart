@@ -222,7 +222,7 @@ class _DashboardState extends State<Dashboard> {
                   color: TColors.primaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.notifications, color: TColors.primaryColor, size: 20),
+                child: const Icon(Icons.notifications, color: TColors.primaryColor, size: 20),
               ),
               title: Row(
                 children: [
@@ -243,7 +243,7 @@ class _DashboardState extends State<Dashboard> {
                     ),
                     child: Text(
                       notificationCount.toString(),
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: TColors.primaryColor,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -332,7 +332,7 @@ class _DashboardState extends State<Dashboard> {
               color: TColors.primaryColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(Icons.book_online, color: TColors.primaryColor, size: 20),
+            child: const Icon(Icons.book_online, color: TColors.primaryColor, size: 20),
           ),
           title: Row(
             children: [

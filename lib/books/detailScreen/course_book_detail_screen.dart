@@ -1,9 +1,11 @@
-import 'package:book_Verse/books/detailScreen/pdflistscreen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../features/home/screens/user/mark/provider.dart';
+import 'book_recommendations.dart';
+import 'genre_book_detail_screen.dart';
+import 'pdflistscreen.dart';
 
 class CourseBookDetailScreen extends StatefulWidget {
   final String title;
@@ -11,7 +13,7 @@ class CourseBookDetailScreen extends StatefulWidget {
   final String imageUrl;
   final String course;
   final String summary;
-  final List<dynamic> genre;
+  final dynamic genre;
 
   const CourseBookDetailScreen({
     super.key,
@@ -20,7 +22,7 @@ class CourseBookDetailScreen extends StatefulWidget {
     required this.imageUrl,
     required this.course,
     required this.summary,
-    this.genre = const [],
+    this.genre,
   });
 
   @override
@@ -30,13 +32,35 @@ class CourseBookDetailScreen extends StatefulWidget {
 class _CourseBookDetailScreenState extends State<CourseBookDetailScreen> {
   bool isBookmarked = false;
   bool isOutOfStock = false;
+  bool _isExpandedSummary = false;
   late String userId;
   bool _mounted = true;
+  List<String> _genres = [];
 
   @override
   void initState() {
     super.initState();
     _initializeData();
+    _processGenres();
+  }
+
+  void _processGenres() {
+    if (widget.genre == null) {
+      _genres = [];
+      return;
+    }
+    
+    try {
+      if (widget.genre is List) {
+        _genres = List<String>.from(widget.genre.map((g) => g.toString()));
+      } else if (widget.genre is String) {
+        _genres = [widget.genre.toString()];
+      } else {
+        _genres = [];
+      }
+    } catch (e) {
+      _genres = [];
+    }
   }
 
   @override
@@ -92,6 +116,7 @@ class _CourseBookDetailScreenState extends State<CourseBookDetailScreen> {
       'imageUrl': widget.imageUrl,
       'course': widget.course,
       'summary': widget.summary,
+      'genre': _genres,
       'userId': userId,
     };
 
@@ -170,29 +195,43 @@ class _CourseBookDetailScreenState extends State<CourseBookDetailScreen> {
         .limit(1)
         .get();
 
-    if (!snapshot.docs.isEmpty && snapshot.docs.first.data()['pdfs'] != null) {
-      final pdfs = List<Map<String, dynamic>>.from(snapshot.docs.first.data()['pdfs']);
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => PDFListScreen2(pdfs: pdfs)),
-      );
+    if (!mounted) return;
+
+    if (snapshot.docs.isNotEmpty) {
+      final bookData = snapshot.docs.first.data();
+      final pdfs = bookData['pdfs'] as List<dynamic>?;
+      
+      if (pdfs != null && pdfs.isNotEmpty) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PDFListScreen2(pdfs: List<Map<String, dynamic>>.from(pdfs)),
+          ),
+        );
+      } else {
+        _showNoPDFDialog();
+      }
     } else {
-      _showNoPDFsDialog();
+      _showErrorDialog('Could not find the book information.');
     }
   }
 
   void _showSnackBar(String message) {
-    if (_mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-    }
+    if (!_mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
-  void _showNoPDFsDialog() {
+  void _showNoPDFDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('No PDFs Found'),
-        content: const Text('No PDFs are available for this book.'),
+        title: const Text('No PDF Available'),
+        content: const Text('This book does not have any PDF versions available.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -203,10 +242,46 @@ class _CourseBookDetailScreenState extends State<CourseBookDetailScreen> {
     );
   }
 
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _navigateToBookDetails(Map<String, dynamic> book) {
+    if (!mounted) return;
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CourseBookDetailScreen(
+          title: book['title'] ?? '',
+          writer: book['writer'] ?? '',
+          imageUrl: book['imageUrl'] ?? '',
+          course: book['course'] ?? '',
+          summary: book['summary'] ?? '',
+          genre: book['genre'] ?? [],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final size = MediaQuery.of(context).size;
+    final isCourseBook = widget.course.isNotEmpty && widget.course != 'Unknown Course';
     
     return Scaffold(
       backgroundColor: isDark ? Colors.black : Colors.white,
@@ -217,7 +292,18 @@ class _CourseBookDetailScreenState extends State<CourseBookDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeroSection(size, isDark),
-            _buildDetailsSection(isDark),
+            if (isCourseBook) 
+              _buildCourseSection(isDark),
+            if (!isCourseBook && _genres.isNotEmpty)
+              _buildGenreTags(isDark),
+            if (isOutOfStock) 
+              _buildOutOfStockBanner(theme),
+            _buildSummarySection(isDark),
+            AuthorRecommendations(
+              writer: widget.writer,
+              currentBookTitle: widget.title,
+            ),
+            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -362,137 +448,206 @@ class _CourseBookDetailScreenState extends State<CourseBookDetailScreen> {
         Text(
           'by ${widget.writer}',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: Colors.grey,
+            color: isDark ? Colors.white70 : Colors.black87,
           ),
         ),
       ],
     ),
   );
 
-  Widget _buildDetailsSection(bool isDark) => Padding(
+  Widget _buildCourseSection(bool isDark) => Padding(
     padding: const EdgeInsets.all(20),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.genre.isNotEmpty || widget.course.isNotEmpty) ...[
-          _buildTags(isDark),
-          const SizedBox(height: 24),
-        ],
-        _buildSummarySection(isDark),
-        if (isOutOfStock) ...[
-          const SizedBox(height: 24),
-          _buildOutOfStockWarning(),
-        ],
-      ],
-    ),
-  );
-
-  Widget _buildTags(bool isDark) => SingleChildScrollView(
-    scrollDirection: Axis.horizontal,
-    child: Row(
-      children: [
-        if (widget.genre.isNotEmpty) ...[
-          ...widget.genre.map((g) => Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: _buildTag(
-              context, 
-              g.toString(),
-              Icons.local_library,
-              isDark
-            ),
-          )).toList(),
-        ]
-        else if (widget.course.isNotEmpty)
-          _buildTag(
-            context, 
-            widget.course,
-            Icons.school,
-            isDark
+        Text(
+          'Course',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white70 : Colors.black87,
           ),
-      ],
-    ),
-  );
-
-  Widget _buildSummarySection(bool isDark) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        'About the Book',
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: isDark ? Colors.white : Colors.black,
         ),
-      ),
-      const SizedBox(height: 12),
-      Text(
-        widget.summary,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          height: 1.6,
-          color: isDark ? Colors.grey[300] : Colors.grey[800],
-        ),
-      ),
-    ],
-  );
-
-  Widget _buildOutOfStockWarning() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    decoration: BoxDecoration(
-      color: Colors.red.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: Colors.red.withOpacity(0.3)),
-    ),
-    child: Row(
-      children: [
+        const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.all(8),
-          decoration: const BoxDecoration(
-            color: Colors.red,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.error_outline, 
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            'This book is currently out of stock',
-            style: TextStyle(
-              color: Colors.red[700],
-              fontWeight: FontWeight.w500,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey[900] : Colors.grey[100],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isDark ? Colors.grey[800]! : Colors.grey[300]!,
+              width: 1,
             ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.school,
+                size: 18,
+                color: isDark ? Colors.white60 : Colors.black54,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                widget.course,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: isDark ? Colors.white60 : Colors.black54,
+                ),
+              ),
+            ],
           ),
         ),
       ],
     ),
   );
 
-  Widget _buildTag(BuildContext context, String text, IconData icon, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  Widget _buildGenreTags(bool isDark) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Genres',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white70 : Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _genres.map((genre) => _buildGenreChip(genre, isDark)).toList(),
+        ),
+      ],
+    ),
+  );
+
+  Widget _buildGenreChip(String genre, bool isDark) => InkWell(
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => GenreBookDetailScreen(genre: genre),
+      ),
+    ),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: isDark ? Colors.grey[800] : Colors.grey[200],
+        color: isDark ? Colors.grey[900] : Colors.grey[100],
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? Colors.grey[800]! : Colors.grey[300]!,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            icon,
+            Icons.local_offer,
             size: 16,
-            color: Theme.of(context).primaryColor,
+            color: isDark ? Colors.white60 : Colors.black54,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Text(
-            text,
-            style: TextStyle(
-              color: isDark ? Colors.white : Colors.black87,
-              fontWeight: FontWeight.w500,
+            genre,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: isDark ? Colors.white60 : Colors.black54,
             ),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+
+  Widget _buildOutOfStockBanner(ThemeData theme) => Container(
+    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    decoration: BoxDecoration(
+      color: theme.colorScheme.error.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(
+        color: theme.colorScheme.error.withOpacity(0.3),
+      ),
+    ),
+    child: Row(
+      children: [
+        Icon(
+          Icons.warning_amber_rounded,
+          color: theme.colorScheme.error,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            'This book is currently out of stock',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.error,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _buildSummarySection(bool isDark) => Padding(
+    padding: const EdgeInsets.all(20),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Summary',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white70 : Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 12),
+        GestureDetector(
+          onTap: () => setState(() => _isExpandedSummary = !_isExpandedSummary),
+          child: AnimatedCrossFade(
+            firstChild: Text(
+              widget.summary,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: isDark ? Colors.white60 : Colors.black54,
+                height: 1.5,
+              ),
+            ),
+            secondChild: Text(
+              widget.summary,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: isDark ? Colors.white60 : Colors.black54,
+                height: 1.5,
+              ),
+            ),
+            crossFadeState: _isExpandedSummary
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 300),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: () => setState(() => _isExpandedSummary = !_isExpandedSummary),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _isExpandedSummary ? 'Show Less' : 'Read More',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              Icon(
+                _isExpandedSummary
+                    ? Icons.keyboard_arrow_up
+                    : Icons.keyboard_arrow_down,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'course_book_detail_screen.dart';
+import 'book_filter_widget.dart';
 
 // Widget to display book recommendations by the same author
 class AuthorBasedRecommendation extends StatefulWidget {
@@ -24,6 +25,9 @@ class _AuthorBasedRecommendationState extends State<AuthorBasedRecommendation> {
   List<Map<String, dynamic>> _recommendedBooks = [];
   // Loading state flag for UI feedback
   bool _isLoading = true;
+  String? _selectedAuthor;
+  List<String> _selectedGenres = [];
+  List<Map<String, dynamic>> _allBooks = [];
 
   @override
   void initState() {
@@ -34,28 +38,28 @@ class _AuthorBasedRecommendationState extends State<AuthorBasedRecommendation> {
   // Fetches all books by the current author excluding the current book
   Future<void> _fetchAuthorBooks() async {
     try {
-      // Query books collection for books by the same author
+      // Initially fetch books by current author
       final snapshot = await _firestore
           .collection('books')
           .where('writer', isEqualTo: widget.writer)
           .get();
 
-      // Process and filter out the current book
-      final books = snapshot.docs
-          .map((doc) => _processBookData(doc.data(), doc.id))
-          .where((book) => book['title'] != widget.currentBookTitle)
-          .toList();
-
       if (mounted) {
+        _allBooks = snapshot.docs
+            .map((doc) => _processBookData(doc.data(), doc.id))
+            .where((book) => book['title'] != widget.currentBookTitle)
+            .toList();
+            
         setState(() {
-          _recommendedBooks = books;
+          _recommendedBooks = List.from(_allBooks);
           _isLoading = false;
         });
       }
     } catch (e) {
-      print('Error fetching author books: $e');
+      print('Error fetching books: $e');
       if (mounted) {
         setState(() {
+          _allBooks = [];
           _recommendedBooks = [];
           _isLoading = false;
         });
@@ -86,14 +90,22 @@ class _AuthorBasedRecommendationState extends State<AuthorBasedRecommendation> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section header showing author's full name
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-          child: Text(
-            'More by ${widget.writer}',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _getHeaderText(),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.filter_list),
+                onPressed: _showFilterBottomSheet,
+              ),
+            ],
           ),
         ),
         if (_isLoading)
@@ -169,6 +181,37 @@ class _AuthorBasedRecommendationState extends State<AuthorBasedRecommendation> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
+            const SizedBox(height: 4),
+            // Genre tags
+            if (book['genre'] != null && (book['genre'] as List).isNotEmpty)
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 4,
+                runSpacing: 4,
+                children: (book['genre'] as List)
+                    .take(2) // Show only first 2 genres to avoid overflow
+                    .map<Widget>((genre) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.blue.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Text(
+                            genre.toString(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                        ))
+                    .toList(),
+              ),
             // Optional course information display
             if (book['course'].isNotEmpty)
               Padding(
@@ -224,5 +267,79 @@ class _AuthorBasedRecommendationState extends State<AuthorBasedRecommendation> {
         ),
       ),
     );
+  }
+
+  void _showFilterBottomSheet() {
+    // Only get available genres since we're not filtering by author anymore
+    final availableGenres = _allBooks
+        .expand((book) => (book['genre'] as List? ?? []))
+        .map((genre) => genre.toString())
+        .toSet()
+        .toList()
+      ..sort();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: BookFilterWidget(
+          currentAuthor: widget.writer, // Pass current author instead of list
+          availableGenres: availableGenres,
+          selectedGenres: _selectedGenres,
+          onFilterChanged: _applyFilters,
+        ),
+      ),
+    );
+  }
+
+  void _applyFilters(String? author, List<String> genres) async {
+    try {
+      setState(() => _isLoading = true);
+
+      if (genres.isNotEmpty) {
+        // Fetch all books that contain any of the selected genres
+        final snapshot = await _firestore
+            .collection('books')
+            .where('genre', arrayContainsAny: genres)
+            .get();
+
+        if (mounted) {
+          setState(() {
+            _selectedGenres = genres;
+            _recommendedBooks = snapshot.docs
+                .map((doc) => _processBookData(doc.data(), doc.id))
+                .where((book) => book['title'] != widget.currentBookTitle)
+                .toList();
+          });
+        }
+      } else {
+        // If no genres selected, show only the current author's books
+        setState(() {
+          _selectedGenres = [];
+          _recommendedBooks = List.from(_allBooks);
+        });
+      }
+    } catch (e) {
+      print('Error applying filters: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // Helper method to get the appropriate header text based on filters
+  String _getHeaderText() {
+    if (_selectedGenres.isNotEmpty) {
+      return 'Books in ${_selectedGenres.join(", ")}';
+    } else {
+      return 'More by ${widget.writer}';
+    }
   }
 }

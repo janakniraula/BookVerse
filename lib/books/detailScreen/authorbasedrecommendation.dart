@@ -7,11 +7,15 @@ import 'book_filter_widget.dart';
 class AuthorBasedRecommendation extends StatefulWidget {
   final String writer;
   final String currentBookTitle;
+  final String course;
+  final List<String> genres;
 
   const AuthorBasedRecommendation({
     super.key,
     required this.writer,
     required this.currentBookTitle,
+    required this.course,
+    required this.genres,
   });
 
   @override
@@ -28,42 +32,102 @@ class _AuthorBasedRecommendationState extends State<AuthorBasedRecommendation> {
   String? _selectedAuthor;
   List<String> _selectedGenres = [];
   List<Map<String, dynamic>> _allBooks = [];
+  bool _showingCourseBooks = false;
+  bool _showingGenreBooks = false;
 
   @override
   void initState() {
     super.initState();
-    _fetchAuthorBooks();
+    _fetchRecommendedBooks();
   }
 
-  // Fetches all books by the current author excluding the current book
-  Future<void> _fetchAuthorBooks() async {
+  Future<void> _fetchRecommendedBooks() async {
     try {
-      // Initially fetch books by current author
-      final snapshot = await _firestore
-          .collection('books')
-          .where('writer', isEqualTo: widget.writer)
-          .get();
+      if (widget.course.isNotEmpty) {
+        setState(() => _isLoading = true);
+        // If it's a course book, fetch other books from the same course
+        await _fetchCourseBooks();
+      } else {
+        // First check if author has any other books without showing loading
+        final authorSnapshot = await _firestore
+            .collection('books')
+            .where('writer', isEqualTo: widget.writer)
+            .get();
 
-      if (mounted) {
-        _allBooks = snapshot.docs
-            .map((doc) => _processBookData(doc.data(), doc.id))
-            .where((book) => book['title'] != widget.currentBookTitle)
+        final authorBooks = authorSnapshot.docs
+            .where((doc) => doc['title'] != widget.currentBookTitle)
             .toList();
-            
-        setState(() {
-          _recommendedBooks = List.from(_allBooks);
-          _isLoading = false;
-        });
+
+        if (authorBooks.isNotEmpty) {
+          // Only show loading and fetch author books if there are any
+          setState(() => _isLoading = true);
+          _allBooks = authorBooks
+              .map((doc) => _processBookData(doc.data(), doc.id))
+              .toList();
+          
+          setState(() {
+            _recommendedBooks = List.from(_allBooks);
+            _isLoading = false;
+          });
+        } else {
+          // Directly fetch genre-based recommendations
+          setState(() => _isLoading = true);
+          await _fetchGenreBooks();
+        }
       }
     } catch (e) {
-      print('Error fetching books: $e');
+      print('Error fetching recommendations: $e');
       if (mounted) {
         setState(() {
           _allBooks = [];
           _recommendedBooks = [];
-          _isLoading = false;
         });
       }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _fetchCourseBooks() async {
+    final snapshot = await _firestore
+        .collection('books')
+        .where('course', isEqualTo: widget.course)
+        .get();
+
+    if (mounted) {
+      _allBooks = snapshot.docs
+          .map((doc) => _processBookData(doc.data(), doc.id))
+          .where((book) => book['title'] != widget.currentBookTitle)
+          .toList();
+      
+      setState(() {
+        _recommendedBooks = List.from(_allBooks);
+        _showingCourseBooks = true;
+      });
+    }
+  }
+
+  Future<void> _fetchGenreBooks() async {
+    if (widget.genres.isEmpty) return;
+
+    final snapshot = await _firestore
+        .collection('books')
+        .where('genre', arrayContainsAny: widget.genres)
+        .limit(10)
+        .get();
+
+    if (mounted) {
+      _allBooks = snapshot.docs
+          .map((doc) => _processBookData(doc.data(), doc.id))
+          .where((book) => book['title'] != widget.currentBookTitle)
+          .toList();
+      
+      setState(() {
+        _recommendedBooks = List.from(_allBooks);
+        _showingGenreBooks = true;
+      });
     }
   }
 
@@ -90,34 +154,33 @@ class _AuthorBasedRecommendationState extends State<AuthorBasedRecommendation> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _getHeaderText(),
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+        if (_recommendedBooks.isNotEmpty || _isLoading) // Only show header if there are books or loading
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _getHeaderText(),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.filter_list),
-                onPressed: _showFilterBottomSheet,
-              ),
-            ],
+                IconButton(
+                  icon: const Icon(Icons.filter_list),
+                  onPressed: _showFilterBottomSheet,
+                ),
+              ],
+            ),
           ),
-        ),
         if (_isLoading)
-          // Loading indicator while fetching books
           const Center(
             child: Padding(
               padding: EdgeInsets.all(20.0),
               child: CircularProgressIndicator(),
             ),
           )
-        else
-          // Horizontal scrollable list of book cards
+        else if (_recommendedBooks.isNotEmpty)
           SizedBox(
             height: 320,
             child: ListView.builder(
@@ -338,6 +401,10 @@ class _AuthorBasedRecommendationState extends State<AuthorBasedRecommendation> {
   String _getHeaderText() {
     if (_selectedGenres.isNotEmpty) {
       return 'Books in ${_selectedGenres.join(", ")}';
+    } else if (_showingCourseBooks) {
+      return 'More from ${widget.course}';
+    } else if (_showingGenreBooks) {
+      return 'Similar Books';
     } else {
       return 'More by ${widget.writer}';
     }

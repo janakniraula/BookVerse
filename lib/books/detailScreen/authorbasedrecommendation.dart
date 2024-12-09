@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:carousel_slider/carousel_slider.dart';
 import 'course_book_detail_screen.dart';
 
 // Widget to display book recommendations by the same author
@@ -87,11 +86,11 @@ class _AuthorBasedRecommendationState extends State<AuthorBasedRecommendation> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section header showing author's first name
+        // Section header showing author's full name
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
           child: Text(
-            'More by ${widget.writer.split(' ')[0]}',
+            'More by ${widget.writer}',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
             ),
@@ -226,4 +225,4 @@ class _AuthorBasedRecommendationState extends State<AuthorBasedRecommendation> {
       ),
     );
   }
-} 
+}

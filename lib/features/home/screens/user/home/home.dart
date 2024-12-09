@@ -109,7 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Grade $grade',
+                  grade,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,

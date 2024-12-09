@@ -13,7 +13,7 @@ class CourseSelectionScreen extends StatelessWidget {
     
     return Scaffold(
       appBar: AppBar(
-        title: Text('Grade $grade Courses'),
+        title: Text('$grade Courses'),
         elevation: 0,
         backgroundColor: isDark ? Colors.black : Colors.white,
       ),

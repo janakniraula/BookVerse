@@ -563,25 +563,46 @@ class _CourseBookDetailScreenState extends State<CourseBookDetailScreen> {
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
     decoration: BoxDecoration(
       color: theme.colorScheme.error.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(12),
       border: Border.all(
-        color: theme.colorScheme.error.withOpacity(0.3),
+        color: theme.colorScheme.error.withOpacity(0.5),
+        width: 1.5,
       ),
     ),
     child: Row(
       children: [
-        Icon(
-          Icons.warning_amber_rounded,
-          color: theme.colorScheme.error,
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.error.withOpacity(0.2),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.warning_amber_rounded,
+            color: theme.colorScheme.error,
+            size: 24,
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Text(
-            'This book is currently out of stock',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.error,
-              fontWeight: FontWeight.w500,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Out of Stock',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.error,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'This book is currently unavailable',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.error.withOpacity(0.8),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -594,7 +615,7 @@ class _CourseBookDetailScreenState extends State<CourseBookDetailScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Summary',
+          'About this book',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
             color: isDark ? Colors.white70 : Colors.black87,

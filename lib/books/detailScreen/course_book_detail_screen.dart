@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../features/home/screens/user/mark/provider.dart';
-import 'book_recommendations.dart';
+import 'authorbasedrecommendation.dart';
 import 'genre_book_detail_screen.dart';
 import 'pdflistscreen.dart';
 
@@ -299,7 +299,7 @@ class _CourseBookDetailScreenState extends State<CourseBookDetailScreen> {
             if (isOutOfStock) 
               _buildOutOfStockBanner(theme),
             _buildSummarySection(isDark),
-            AuthorRecommendations(
+            AuthorBasedRecommendation(
               writer: widget.writer,
               currentBookTitle: widget.title,
             ),
